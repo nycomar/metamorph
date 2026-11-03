@@ -5,6 +5,10 @@ Usage (from ``api/``)::
     .venv/bin/python -m app.pipeline.cli stages --source ../docs/test-images/ring-synthetic.png \\
         --stages ../docs/runs/stages.json --out ../docs/runs/<ts>/stages
 
+``--stages`` is a JSON list of **transformation** stages only. The source is
+copied to ``stage-0.png`` without a Cloud job; stages 1..N become ``stage-1.png``
+.. ``stage-N.png``.
+
     .venv/bin/python -m app.pipeline.cli render --images ../docs/runs/<ts>/stages \\
         --out ../docs/runs/<ts>/take.mp4 --frames 49 --width 480 --height 832
 """
@@ -23,8 +27,7 @@ from .stages import StageSpec, StageTuning, build_stages
 log = logging.getLogger("pipeline.cli")
 
 DEFAULT_STAGES = [
-    StageSpec(label="Metal ring", prompt="a polished metal ring on dark stone, studio light, same silhouette"),
-    StageSpec(label="Living plant", prompt="the same ring has become living plant matter, roots and leaves holding the same silhouette"),
+    StageSpec(label="Living plant", prompt="the object becomes living plant matter, roots and leaves holding the same silhouette"),
     StageSpec(label="Organic flesh", prompt="the same shape turns to wet organic flesh, softly breathing, same silhouette"),
     StageSpec(label="Mechanical organism", prompt="the same form becomes a mechanical organism of brass and steel, same silhouette"),
 ]
@@ -94,16 +97,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_stages = sub.add_parser("stages", help="generate the N stage images")
+    p_stages = sub.add_parser("stages", help="copy the source to stage-0 and generate the N transformation images")
     p_stages.add_argument("--source", required=True)
-    p_stages.add_argument("--stages", default=None, help="JSON list of {label, prompt, weight}")
+    p_stages.add_argument("--stages", default=None, help="JSON list of transformation stages {label, prompt, weight}")
     p_stages.add_argument("--out", required=True)
     p_stages.add_argument("--denoise", type=float, default=None, help="KSampler denoise (default: graph)")
     p_stages.add_argument("--cn-depth", type=float, default=None, help="depth ControlNet strength (default: graph)")
     p_stages.add_argument("--cn-canny", type=float, default=None, help="canny ControlNet strength (default: graph)")
     p_stages.add_argument("--ipa-weight", type=float, default=None, help="IPAdapter weight (default: graph)")
     p_stages.add_argument("--ipa-weight-type", default=None, help="IPAdapter weight_type (default: graph)")
-    p_stages.add_argument("--only-index", type=int, default=None, help="generate only this stage position (0-based)")
+    p_stages.add_argument("--only-index", type=int, default=None, help="generate only this transformation stage (0-based); stage-0 source is always copied")
     p_stages.add_argument(
         "--image-model",
         choices=("sdxl", "flux"),

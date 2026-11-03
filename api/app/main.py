@@ -15,8 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from .cloud import CloudClient, CloudError
 from .config import settings
 from .db import init
-from .jobs import make_render_handler
+from .jobs import make_render_handler, transformation_stage_rows
 from .storage import (
+    MAX_TRANSFORMATION_STAGES,
+    MIN_TRANSFORMATION_STAGES,
     PROJECTS_DIR,
     parse_stages,
     project_dir,
@@ -172,13 +174,18 @@ async def queue_render(project_id: str) -> dict:
     row = _project_row(project_id)
     if row is None:
         raise HTTPException(status_code=404, detail=f"project {project_id} not found")
-    count = conn.execute(
-        "SELECT COUNT(*) FROM stages WHERE project_id=?", (project_id,)
-    ).fetchone()[0]
-    if not 2 <= count <= 6:
+    stage_rows = conn.execute(
+        "SELECT * FROM stages WHERE project_id=? ORDER BY position", (project_id,)
+    ).fetchall()
+    count = len(transformation_stage_rows(stage_rows))
+    if not MIN_TRANSFORMATION_STAGES <= count <= MAX_TRANSFORMATION_STAGES:
         raise HTTPException(
             status_code=400,
-            detail=f"render needs between 2 and 6 stages, project has {count}",
+            detail=(
+                "render needs between "
+                f"{MIN_TRANSFORMATION_STAGES} and {MAX_TRANSFORMATION_STAGES} "
+                f"transformation stages, project has {count}"
+            ),
         )
 
     job_id = uuid.uuid4().hex

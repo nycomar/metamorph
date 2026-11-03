@@ -1,4 +1,8 @@
-"""Stage image generation: one photo + N prompts -> N silhouette-locked PNGs.
+"""Stage image generation: one source photo + N transformation prompts -> source + N PNGs.
+
+Stage 0 is the uploaded source, copied verbatim; it never goes near a Cloud job.
+Stages 1..N are the transformations the user wrote, each generated with a
+silhouette-locked graph.
 
 Two graphs are supported: ``workflows/stage.json`` (SDXL base + depth ControlNet
 + IPAdapter of the source) and ``workflows/stage_flux.json`` (FLUX.1-dev + depth
@@ -12,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +34,10 @@ STAGE_PROMPT_SUFFIX = ", single object centered on dark stone, soft studio light
 # means the only thing that changes between stages is the prompt (material), so
 # the guides are layout-identical — which is what makes the final morph smooth.
 STAGE_SEED = 1337
+
+# Stage 0 is the source photo, so the user supplies only what the object becomes.
+MIN_TRANSFORMATION_STAGES = 1
+MAX_TRANSFORMATION_STAGES = 5
 
 
 @dataclass(frozen=True)
@@ -103,18 +112,30 @@ async def build_stages(
     only_index: int | None = None,
     image_model: str | None = None,
 ) -> list[Path]:
-    """Generate one PNG per stage, in order. Returns the paths.
+    """Copy the source to ``stage-0.png``, then generate one PNG per transformation.
+
+    Returns ``1 + len(stages)`` paths, in order: the source copy followed by the
+    generated transformations. Each user stage describes what the object
+    *becomes*, so it is rendered into ``stage-1.png`` .. ``stage-N.png``.
 
     ``StageSpec.weight`` is carried through to the written manifest so the
     orchestrator can later map it onto per-guide strength in the render; this
     function itself renders every stage at the same strength.
 
     ``tuning`` overrides the graph's denoise / ControlNet / IPAdapter knobs.
-    ``only_index`` generates just one stage position while keeping its original
-    ``stage-{i}.png`` filename (items are still numbered by their position).
+    ``only_index`` generates just one transformation stage (0-based index into
+    ``stages``) while keeping its ``stage-{index + 1}.png`` filename; the source
+    copy is still written.
     ``image_model`` picks ``stage.json`` (``sdxl``) or ``stage_flux.json``
     (``flux``); ``None`` uses the configured default.
     """
+    if not MIN_TRANSFORMATION_STAGES <= len(stages) <= MAX_TRANSFORMATION_STAGES:
+        raise ValueError(
+            "build_stages expects between "
+            f"{MIN_TRANSFORMATION_STAGES} and {MAX_TRANSFORMATION_STAGES} "
+            f"transformation stages, got {len(stages)}"
+        )
+
     model_name = (image_model or settings.image_model or "sdxl").strip().lower()
     model = _resolve_model(model_name)
     if model.ipa is None and tuning is not None:
@@ -122,16 +143,34 @@ async def build_stages(
             raise ValueError(f"image_model {model_name!r} has no IPAdapter node")
 
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Stage 0 is the photo the user uploaded: copy it, never regenerate it.
+    source_copy = out_dir / "stage-0.png"
+    if source.resolve() != source_copy.resolve():
+        shutil.copyfile(source, source_copy)
+    print(f"stage 0 (source) -> {source_copy}", flush=True)
+
+    results: list[Path] = [source_copy]
+    manifest: list[dict] = [
+        {
+            "label": "Source",
+            "prompt": "",
+            "weight": 1.0,
+            "path": str(source_copy),
+            "prompt_id": None,
+            "seconds": 0.0,
+            "image_model": None,
+        }
+    ]
+
     client = get_client()
     workflow = load_workflow(model.workflow)
 
     upload = await client.upload_image(str(source), source.name)
     src_name = upload.get("name") or source.name
 
-    results: list[Path] = []
-    manifest: list[dict] = []
-    for i, stage in enumerate(stages):
-        if only_index is not None and i != only_index:
+    for i, stage in enumerate(stages, start=1):
+        if only_index is not None and i - 1 != only_index:
             continue
         prompt = f"{stage.prompt}{STAGE_PROMPT_SUFFIX}"
         wf = override(workflow, model.source, "image", src_name)
@@ -155,7 +194,10 @@ async def build_stages(
 
         t0 = time.monotonic()
         prompt_id = await client.submit(wf)
-        print(f"stage {i + 1}/{len(stages)} submitted prompt_id={prompt_id}", flush=True)
+        print(
+            f"transformation {i}/{len(stages)} submitted prompt_id={prompt_id}",
+            flush=True,
+        )
         detail = await wait_for_job(client, prompt_id)
         out_path = out_dir / f"stage-{i}.png"
         await download_first_output(client, detail, out_path)
@@ -173,7 +215,8 @@ async def build_stages(
             }
         )
         print(
-            f"stage {i + 1}/{len(stages)} {stage.label!r} -> {out_path} prompt_id={prompt_id} {elapsed:.1f}s",
+            f"transformation {i}/{len(stages)} {stage.label!r} -> {out_path} "
+            f"prompt_id={prompt_id} {elapsed:.1f}s",
             flush=True,
         )
 

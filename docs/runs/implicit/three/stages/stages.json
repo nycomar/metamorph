@@ -1,0 +1,38 @@
+[
+  {
+    "label": "Source",
+    "prompt": "",
+    "weight": 1.0,
+    "path": "../docs/runs/implicit/three/stages/stage-0.png",
+    "prompt_id": null,
+    "seconds": 0.0,
+    "image_model": null
+  },
+  {
+    "label": "Living plant",
+    "prompt": "a ring made of living green moss, ivy leaves and roots, wet organic plant matter, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/implicit/three/stages/stage-1.png",
+    "prompt_id": "fb2d6792-f009-4a21-ab29-f6ce13728d43",
+    "seconds": 12.3,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Organic flesh",
+    "prompt": "a ring of wet glistening red organic flesh, veins and muscle texture, softly breathing, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/implicit/three/stages/stage-2.png",
+    "prompt_id": "073af309-b824-456b-8bfe-61a1cc926f76",
+    "seconds": 7.6,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Brass machine",
+    "prompt": "a ring made of brass gears, copper pipes and rivets, steampunk mechanical organism, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/implicit/three/stages/stage-3.png",
+    "prompt_id": "8da13c39-1a30-46ea-b319-1864987c22e3",
+    "seconds": 7.7,
+    "image_model": "sdxl"
+  }
+]

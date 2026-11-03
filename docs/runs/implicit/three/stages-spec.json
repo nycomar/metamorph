@@ -1,0 +1,5 @@
+[
+  { "label": "Living plant", "prompt": "a ring made of living green moss, ivy leaves and roots, wet organic plant matter, same circular silhouette", "weight": 1.0 },
+  { "label": "Organic flesh", "prompt": "a ring of wet glistening red organic flesh, veins and muscle texture, softly breathing, same circular silhouette", "weight": 1.0 },
+  { "label": "Brass machine", "prompt": "a ring made of brass gears, copper pipes and rivets, steampunk mechanical organism, same circular silhouette", "weight": 1.0 }
+]

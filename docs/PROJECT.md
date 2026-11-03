@@ -10,9 +10,9 @@ Upload one photo of an object, name its evolutionary stages, get back **one cont
 
 ```
 source photo
-  → anchors: depth + edges (DepthAnythingV3, Canny)
-  → N stage images: img2img + ControlNet(depth/edge) + IPAdapter(source)
-  → guides pinned at evenly spaced frames, first to last  (LTXVKeyframer / LTXVAddGuide)
+  → stage 0: the source photo, copied verbatim (never generated)
+  → 1–5 transformation images: img2img + ControlNet(depth/edge) + IPAdapter(source)
+  → 2–6 images pinned as guides at evenly spaced frames, first to last  (LTXVKeyframer / LTXVAddGuide)
   → one LTX-2.5 pass (video + audio, 24 fps, context windows for loop)
   → continuous morph video → 9:16 / 16:9 / looping WebP
 ```
@@ -37,13 +37,15 @@ Three people collide only at interfaces. These are the interfaces.
 ```python
 # api/app/pipeline/stages.py
 async def build_stages(source: Path, stages: list[StageSpec], out_dir: Path) -> list[Path]:
-    '''Returns N image paths, one per stage, in order.'''
+    '''Copies source to stage-0.png, then returns 1 + len(stages) paths, in order.'''
 
 # api/app/pipeline/evolve.py
 async def render_evolution(stage_images: list[Path], spec: EvolutionSpec,
                            out_path: Path) -> RenderResult:
     '''Returns RenderResult(path, duration_s, width, height).'''
 ```
+
+Stage 0 is the uploaded source photo, copied byte-for-byte — never generated. `stages` holds only the transformations the user writes (1–5 prompts), so a render always has 2–6 images total. `build_stages` rejects anything outside 1–5 stages; `render_evolution` accepts 2–6 images.
 
 `StageSpec(label: str, prompt: str, weight: float)`, `EvolutionSpec(frames: int, width: int, height: int, seed: int, loop: bool)`.
 Both use the shared `CloudClient` (`api/app/cloud.py`) — no direct HTTP from pipeline code.
@@ -56,9 +58,9 @@ Both use the shared `CloudClient` (`api/app/cloud.py`) — no direct HTTP from p
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/projects` | multipart `source` + JSON `stages` → `{id, stages[]}` |
+| POST | `/api/projects` | multipart `source` + JSON transformation `stages` (1–5) → `{id, stages[]}` |
 | GET | `/api/projects/{id}` | project, stages, takes, status |
-| PUT | `/api/projects/{id}/stages` | replace stage list (order matters) |
+| PUT | `/api/projects/{id}/stages` | replace transformation stage list (1–5, order matters) |
 | POST | `/api/projects/{id}/render` | queue a render → `{job_id}` |
 | POST | `/api/projects/{id}/stages/{pos}/reroll` | regenerate one stage, then re-render |
 | GET | `/api/jobs/{job_id}/events` | SSE progress stream |
@@ -93,8 +95,8 @@ api/data/projects/{project_id}/
 
 | # | Track | Ticket | Depends on | Done when |
 | --- | --- | --- | --- | --- |
-| A1 | A | Stage image generator | — | one photo + 4 prompts → 4 PNGs with silhouette preserved; CLI runs it end to end |
-| A2 | A | Evolution render | A1 | 4 stage PNGs → one 5 s 9:16 MP4 with audio; guides landing on the right frames |
+| A1 | A | Stage image generator | — | source + 1–5 transformation prompts → 2–6 PNGs with silhouette preserved; CLI runs it end to end |
+| A2 | A | Evolution render | A1 | 2–6 stage images → one 5 s 9:16 MP4 with audio; guides landing on the right frames |
 | A3 | A | **Quality matrix** (the gate) | A1, A2 | `docs/MATRIX.md`: 3 settings × 1 object, side-by-side, verdict morph vs dissolve, chosen settings |
 | B1 | B | Projects + stages API + upload | — | POST/GET/PUT work; files under `data/projects/{id}/`; rows in SQLite |
 | B2 | B | Job runner + SSE | B1, A1/A2 | render queues; SSE streams state/progress; failures surface text |

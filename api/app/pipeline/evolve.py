@@ -1,15 +1,16 @@
-"""Evolution render: N stage images pinned to frames -> one continuous video.
+"""Evolution render: N images (source + transformations) pinned to frames -> one video.
 
 ``video_model="h3"`` (the default) uses ``workflows/evolve_h3.json`` (MiniMax H3
-fl2va, video + audio). Stage 0 is ``MiniMaxH3ImageToVideo.first_frame``; stages
-1..N-1 are ``MiniMaxH3AddGuide`` anchors on the same positive-conditioning
-chain. H3 snaps its frame count up to the model's 17k+5 grid, so override
-indices are computed from the snapped length.
+fl2va, video + audio). The first image (the uploaded source) is
+``MiniMaxH3ImageToVideo.first_frame``; the remaining transformation images are
+``MiniMaxH3AddGuide`` anchors on the same positive-conditioning chain. H3 snaps
+its frame count up to the model's 17k+5 grid, so override indices are computed
+from the snapped length.
 
 ``video_model="ltx"`` uses ``workflows/evolve.json`` (LTX-2.5 distilled, single
-pass, video + audio). The first stage lands at frame 0 via ``LTXVImgToVideo``;
-stages 1..N-1 land on evenly spaced frames via chained ``LTXVAddGuide`` nodes (up
-to five, so 2-6 stages).
+pass, video + audio). The first image lands at frame 0 via ``LTXVImgToVideo``;
+the remaining images land on evenly spaced frames via chained ``LTXVAddGuide``
+nodes (up to five, so 2-6 images total: source + 1-5 transformations).
 
 In both graphs guides the current run does not need are removed from the
 submitted graph, and the tail is rewired to the last used guide, so unused slots
@@ -91,7 +92,8 @@ async def render_evolution(
     count = len(stage_images)
     if not MIN_STAGES <= count <= MAX_STAGES:
         raise ValueError(
-            f"render_evolution expects {MIN_STAGES}-{MAX_STAGES} stage images, got {count}"
+            f"render_evolution expects {MIN_STAGES}-{MAX_STAGES} images "
+            f"(source + transformations), got {count}"
         )
     if spec.loop:
         log.warning("spec.loop=True is not yet wired (linear metamorphosis arc does not close a loop)")

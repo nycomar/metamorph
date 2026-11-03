@@ -11,6 +11,9 @@ from .config import settings
 PROJECTS_DIR = settings.data_dir / "projects"
 PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 
+MIN_TRANSFORMATION_STAGES = 1
+MAX_TRANSFORMATION_STAGES = 5
+
 
 def project_dir(project_id: str) -> Path:
     return PROJECTS_DIR / project_id
@@ -31,8 +34,12 @@ def parse_stages(value: object) -> list[dict]:
         value = value["stages"]
     if not isinstance(value, list):
         raise ValueError("stages must be a JSON array")
-    if not value:
-        raise ValueError("stages must contain at least one stage")
+    if not MIN_TRANSFORMATION_STAGES <= len(value) <= MAX_TRANSFORMATION_STAGES:
+        raise ValueError(
+            "stages must contain between "
+            f"{MIN_TRANSFORMATION_STAGES} and {MAX_TRANSFORMATION_STAGES} "
+            f"transformation stages, got {len(value)}"
+        )
 
     out: list[dict] = []
     for i, item in enumerate(value):
