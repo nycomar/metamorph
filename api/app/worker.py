@@ -30,11 +30,21 @@ class Worker:
                 await asyncio.sleep(1.5)
                 continue
             await self.sem.acquire()
+            # Claim atomically before scheduling, otherwise this loop can pick the
+            # same queued row again before the new task gets a chance to run.
+            cur = self.conn.execute(
+                "UPDATE jobs SET state='running', updated_at=datetime('now') "
+                "WHERE id=? AND state='queued'",
+                (row["id"],),
+            )
+            self.conn.commit()
+            if cur.rowcount == 0:
+                self.sem.release()
+                continue
             asyncio.create_task(self._run(row))
 
     async def _run(self, row: sqlite3.Row) -> None:
         try:
-            self._set_state(row["id"], "running")
             handler = self.handlers.get(row["kind"])
             if handler is None:
                 raise RuntimeError(f"no handler for {row['kind']}")
