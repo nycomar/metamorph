@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     max_concurrent_jobs: int = 1
     request_timeout_s: float = 120.0
+    image_model: str = "sdxl"
 
     @classmethod
     def load(cls) -> "Settings":

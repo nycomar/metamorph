@@ -62,7 +62,12 @@ async def cmd_stages(args: argparse.Namespace) -> None:
         ipa_weight_type=args.ipa_weight_type,
     )
     paths = await build_stages(
-        Path(args.source), stages, out, tuning=tuning, only_index=args.only_index
+        Path(args.source),
+        stages,
+        out,
+        tuning=tuning,
+        only_index=args.only_index,
+        image_model=args.image_model,
     )
     print(json.dumps([str(p) for p in paths]))
 
@@ -98,6 +103,12 @@ def main() -> None:
     p_stages.add_argument("--ipa-weight", type=float, default=None, help="IPAdapter weight (default: graph)")
     p_stages.add_argument("--ipa-weight-type", default=None, help="IPAdapter weight_type (default: graph)")
     p_stages.add_argument("--only-index", type=int, default=None, help="generate only this stage position (0-based)")
+    p_stages.add_argument(
+        "--image-model",
+        choices=("sdxl", "flux"),
+        default=None,
+        help="stage image model (default: IMAGE_MODEL env var, else sdxl)",
+    )
     p_stages.set_defaults(func=cmd_stages)
 
     p_render = sub.add_parser("render", help="render one continuous evolution video")

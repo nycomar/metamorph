@@ -1,8 +1,12 @@
 """Stage image generation: one photo + N prompts -> N silhouette-locked PNGs.
 
-The graph is ``workflows/stage.json`` (SDXL base + ControlNet depth/edge anchors
-+ IPAdapter of the source, img2img from the encoded source). Every field we touch
-is listed in ``workflows/README.md``.
+Two graphs are supported: ``workflows/stage.json`` (SDXL base + depth ControlNet
++ IPAdapter of the source) and ``workflows/stage_flux.json`` (FLUX.1-dev + depth
+ControlNet, no IPAdapter). Both use img2img from the encoded source. Every field
+we touch is listed in ``workflows/README.md``.
+
+Select the graph with ``image_model`` (``sdxl`` or ``flux``), the ``--image-model``
+CLI flag, or the ``IMAGE_MODEL`` environment variable.
 """
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..config import settings
 from ._util import download_first_output, get_client, load_workflow, override, wait_for_job
 
 log = logging.getLogger("pipeline.stages")
@@ -26,6 +31,49 @@ STAGE_PROMPT_SUFFIX = ", single object centered on dark stone, soft studio light
 STAGE_SEED = 1337
 
 
+@dataclass(frozen=True)
+class StageModel:
+    """Which graph to load and the node ids the pipeline is allowed to override."""
+
+    workflow: str
+    source: str
+    positive: str
+    sampler: str
+    save: str
+    depth: str
+    ipa: str | None = None
+
+
+STAGE_MODELS: dict[str, StageModel] = {
+    "sdxl": StageModel(
+        workflow="stage.json",
+        source="1",
+        positive="3",
+        sampler="14",
+        save="16",
+        depth="9",
+        ipa="12",
+    ),
+    "flux": StageModel(
+        workflow="stage_flux.json",
+        source="1",
+        positive="4",
+        sampler="14",
+        save="16",
+        depth="9",
+    ),
+}
+
+
+def _resolve_model(image_model: str | None) -> StageModel:
+    name = (image_model or settings.image_model or "sdxl").strip().lower()
+    try:
+        return STAGE_MODELS[name]
+    except KeyError:
+        valid = ", ".join(sorted(STAGE_MODELS))
+        raise ValueError(f"unknown image_model {name!r}; expected one of: {valid}") from None
+
+
 @dataclass
 class StageSpec:
     label: str
@@ -37,7 +85,7 @@ class StageSpec:
 class StageTuning:
     """Optional overrides for the stage graph's generation knobs.
 
-    ``None`` means "leave the value from ``workflows/stage.json``".
+    ``None`` means "leave the value from the selected stage graph".
     """
 
     denoise: float | None = None
@@ -53,6 +101,7 @@ async def build_stages(
     out_dir: Path,
     tuning: StageTuning | None = None,
     only_index: int | None = None,
+    image_model: str | None = None,
 ) -> list[Path]:
     """Generate one PNG per stage, in order. Returns the paths.
 
@@ -63,10 +112,18 @@ async def build_stages(
     ``tuning`` overrides the graph's denoise / ControlNet / IPAdapter knobs.
     ``only_index`` generates just one stage position while keeping its original
     ``stage-{i}.png`` filename (items are still numbered by their position).
+    ``image_model`` picks ``stage.json`` (``sdxl``) or ``stage_flux.json``
+    (``flux``); ``None`` uses the configured default.
     """
+    model_name = (image_model or settings.image_model or "sdxl").strip().lower()
+    model = _resolve_model(model_name)
+    if model.ipa is None and tuning is not None:
+        if tuning.ipa_weight is not None or tuning.ipa_weight_type is not None:
+            raise ValueError(f"image_model {model_name!r} has no IPAdapter node")
+
     out_dir.mkdir(parents=True, exist_ok=True)
     client = get_client()
-    workflow = load_workflow("stage.json")
+    workflow = load_workflow(model.workflow)
 
     upload = await client.upload_image(str(source), source.name)
     src_name = upload.get("name") or source.name
@@ -77,21 +134,24 @@ async def build_stages(
         if only_index is not None and i != only_index:
             continue
         prompt = f"{stage.prompt}{STAGE_PROMPT_SUFFIX}"
-        wf = override(workflow, "1", "image", src_name)
-        wf = override(wf, "3", "text", prompt)
-        wf = override(wf, "14", "seed", STAGE_SEED)
-        wf = override(wf, "16", "filename_prefix", f"metamorph/stage_{i}")
+        wf = override(workflow, model.source, "image", src_name)
+        wf = override(wf, model.positive, "text", prompt)
+        wf = override(wf, model.sampler, "seed", STAGE_SEED)
+        wf = override(wf, model.save, "filename_prefix", f"metamorph/stage_{i}")
         if tuning is not None:
             if tuning.denoise is not None:
-                wf = override(wf, "14", "denoise", tuning.denoise)
+                wf = override(wf, model.sampler, "denoise", tuning.denoise)
             if tuning.cn_depth is not None:
-                wf = override(wf, "9", "strength", tuning.cn_depth)
+                wf = override(wf, model.depth, "strength", tuning.cn_depth)
             if tuning.cn_canny is not None:
+                if model.ipa is None:
+                    raise ValueError(f"image_model {model_name!r} has no canny ControlNet")
                 wf = override(wf, "10", "strength", tuning.cn_canny)
-            if tuning.ipa_weight is not None:
-                wf = override(wf, "12", "weight", tuning.ipa_weight)
-            if tuning.ipa_weight_type is not None:
-                wf = override(wf, "12", "weight_type", tuning.ipa_weight_type)
+            if model.ipa is not None:
+                if tuning.ipa_weight is not None:
+                    wf = override(wf, model.ipa, "weight", tuning.ipa_weight)
+                if tuning.ipa_weight_type is not None:
+                    wf = override(wf, model.ipa, "weight_type", tuning.ipa_weight_type)
 
         t0 = time.monotonic()
         prompt_id = await client.submit(wf)
@@ -109,6 +169,7 @@ async def build_stages(
                 "path": str(out_path),
                 "prompt_id": prompt_id,
                 "seconds": round(elapsed, 1),
+                "image_model": model_name,
             }
         )
         print(

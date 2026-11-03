@@ -1,0 +1,111 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "source.png" },
+    "_meta": { "title": "Load source photo" }
+  },
+  "17": {
+    "class_type": "ImageScale",
+    "inputs": { "image": ["1", 0], "upscale_method": "lanczos", "width": 768, "height": 768, "crop": "center" },
+    "_meta": { "title": "Normalize source to 1:1" }
+  },
+  "2": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "flux1-dev.safetensors", "weight_dtype": "default" },
+    "_meta": { "title": "Load FLUX.1-dev UNet" }
+  },
+  "3": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux"
+    },
+    "_meta": { "title": "Load FLUX text encoders (T5 + CLIP-L)" }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "a polished silver metal ring, brushed steel surface, dark stone floor, studio light, dark background", "clip": ["3", 0] },
+    "_meta": { "title": "Positive prompt" }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["3", 0] },
+    "_meta": { "title": "Empty negative (cfg 1.0, unused)" }
+  },
+  "6": {
+    "class_type": "DepthAnythingV2Preprocessor",
+    "inputs": { "image": ["17", 0] },
+    "_meta": { "title": "Depth anchor" }
+  },
+  "7": {
+    "class_type": "ControlNetLoader",
+    "inputs": { "control_net_name": "Flux1Dev_CNup-FP8.safetensors" },
+    "_meta": { "title": "Load FLUX depth ControlNet" }
+  },
+  "18": {
+    "class_type": "SetShakkerLabsUnionControlNetType",
+    "inputs": { "control_net": ["7", 0], "type": "depth" },
+    "_meta": { "title": "Select depth mode on union ControlNet" }
+  },
+  "8": {
+    "class_type": "FluxGuidance",
+    "inputs": { "conditioning": ["4", 0], "guidance": 3.5 },
+    "_meta": { "title": "FLUX guidance" }
+  },
+  "9": {
+    "class_type": "ControlNetApplyAdvanced",
+    "inputs": {
+      "positive": ["8", 0],
+      "negative": ["5", 0],
+      "control_net": ["18", 0],
+      "image": ["6", 0],
+      "strength": 0.65,
+      "start_percent": 0.0,
+      "end_percent": 1.0,
+      "vae": ["11", 0]
+    },
+    "_meta": { "title": "Apply depth ControlNet" }
+  },
+  "10": {
+    "class_type": "ModelSamplingFlux",
+    "inputs": { "model": ["2", 0], "max_shift": 1.15, "base_shift": 0.5, "width": 768, "height": 768 },
+    "_meta": { "title": "FLUX sampling shift" }
+  },
+  "11": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "ae.safetensors" },
+    "_meta": { "title": "Load FLUX VAE" }
+  },
+  "13": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["17", 0], "vae": ["11", 0] },
+    "_meta": { "title": "Encode source (img2img init)" }
+  },
+  "14": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["10", 0],
+      "seed": 1337,
+      "steps": 20,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": ["9", 0],
+      "negative": ["9", 1],
+      "latent_image": ["13", 0],
+      "denoise": 1.0
+    },
+    "_meta": { "title": "Sample stage" }
+  },
+  "15": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["14", 0], "vae": ["11", 0] },
+    "_meta": { "title": "Decode stage" }
+  },
+  "16": {
+    "class_type": "SaveImage",
+    "inputs": { "images": ["15", 0], "filename_prefix": "metamorph/stage" },
+    "_meta": { "title": "Save stage image" }
+  }
+}

@@ -1,0 +1,11 @@
+[
+  {
+    "label": "plant",
+    "prompt": "a circular wreath of living green moss and vines forming a ring, wet organic texture, small leaves, dark background, studio light",
+    "weight": 1.0,
+    "path": "/var/www/metamorph/docs/runs/flux/plant-flux.png",
+    "prompt_id": "0ddb29bb-d9bf-4b91-94b8-f664428b3be3",
+    "seconds": 39.3,
+    "image_model": "flux"
+  }
+]
