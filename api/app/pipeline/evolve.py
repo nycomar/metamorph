@@ -1,15 +1,15 @@
 """Evolution render: N stage images pinned to frames -> one continuous video.
 
-``video_model="ltx"`` (the default) uses ``workflows/evolve.json`` (LTX-2.5
-distilled, single pass, video + audio). The first stage lands at frame 0 via
-``LTXVImgToVideo``; stages 1..N-1 land on evenly spaced frames via chained
-``LTXVAddGuide`` nodes (up to five, so 2-6 stages).
+``video_model="h3"`` (the default) uses ``workflows/evolve_h3.json`` (MiniMax H3
+fl2va, video + audio). Stage 0 is ``MiniMaxH3ImageToVideo.first_frame``; stages
+1..N-1 are ``MiniMaxH3AddGuide`` anchors on the same positive-conditioning
+chain. H3 snaps its frame count up to the model's 17k+5 grid, so override
+indices are computed from the snapped length.
 
-``video_model="h3"`` uses ``workflows/evolve_h3.json`` (MiniMax H3 fl2va, video +
-audio). Stage 0 is ``MiniMaxH3ImageToVideo.first_frame``; stages 1..N-1 are
-``MiniMaxH3AddGuide`` anchors on the same positive-conditioning chain. H3 snaps
-its frame count up to the model's 17k+5 grid, so override indices are computed
-from the snapped length.
+``video_model="ltx"`` uses ``workflows/evolve.json`` (LTX-2.5 distilled, single
+pass, video + audio). The first stage lands at frame 0 via ``LTXVImgToVideo``;
+stages 1..N-1 land on evenly spaced frames via chained ``LTXVAddGuide`` nodes (up
+to five, so 2-6 stages).
 
 In both graphs guides the current run does not need are removed from the
 submitted graph, and the tail is rewired to the last used guide, so unused slots
@@ -56,6 +56,7 @@ class EvolutionSpec:
     height: int
     seed: int
     loop: bool = False
+    video_prompt: str | None = None
 
 
 @dataclass
@@ -84,7 +85,7 @@ async def render_evolution(
     stage_images: list[Path],
     spec: EvolutionSpec,
     out_path: Path,
-    video_model: str = "ltx",
+    video_model: str = "h3",
 ) -> RenderResult:
     """Render one continuous metamorphosis shot and write it to ``out_path``."""
     count = len(stage_images)
@@ -119,6 +120,8 @@ async def render_evolution(
         wf = override(wf, "12", "width", spec.width)     # MiniMaxH3ImageToVideo
         wf = override(wf, "12", "height", spec.height)
         wf = override(wf, "12", "length", render_frames)
+        if spec.video_prompt:
+            wf = override(wf, "12", "prompt", spec.video_prompt)
         for node_id, frame_idx in zip(used_guides, idx[1:]):
             wf = override(wf, node_id, "frame_idx", frame_idx)
         wf = override(wf, "19", "noise_seed", spec.seed)

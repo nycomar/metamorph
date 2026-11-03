@@ -112,10 +112,10 @@ IPAdapter is SDXL-only; `--ipa-weight` / `--ipa-weight-type` are rejected when
 
 ## MiniMax H3 evolution graph (`evolve_h3.json`, `video_model=h3`)
 
-This is an experimental comparison path. The LTX graph above stays the default
-(`video_model="ltx"` / `--video-model ltx`); selecting `h3` swaps in
-`workflows/evolve_h3.json` and its own override table without changing the LTX
-graph or overrides.
+This is the default path (`video_model="h3"` / `--video-model h3`). The LTX
+graph above stays available as the fallback / Open-Weights option
+(`--video-model ltx`). Selecting a model swaps in its own graph and override
+table without changing the other.
 
 The graph is MiniMax H3 **fl2va** with native audio. Stage 0 is the
 `MiniMaxH3ImageToVideo.first_frame` anchor; stages 1..N-1 are

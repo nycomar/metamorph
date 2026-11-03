@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     max_concurrent_jobs: int = 1
     request_timeout_s: float = 120.0
     image_model: str = "sdxl"
+    video_model: str = "h3"
 
     @classmethod
     def load(cls) -> "Settings":

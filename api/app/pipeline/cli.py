@@ -82,6 +82,7 @@ async def cmd_render(args: argparse.Namespace) -> None:
         height=args.height,
         seed=args.seed,
         loop=args.loop,
+        video_prompt=args.prompt,
     )
     result = await render_evolution(images, spec, Path(args.out), video_model=args.video_model)
     print(json.dumps({"path": str(result.path), "duration_s": result.duration_s, "width": result.width, "height": result.height}))
@@ -120,10 +121,15 @@ def main() -> None:
     p_render.add_argument("--seed", type=int, default=0)
     p_render.add_argument("--loop", action="store_true")
     p_render.add_argument(
+        "--prompt",
+        default=None,
+        help="video prompt (H3 only; default: prompt from the workflow graph)",
+    )
+    p_render.add_argument(
         "--video-model",
         choices=("ltx", "h3"),
-        default="ltx",
-        help="video model / graph (default: ltx)",
+        default="h3",
+        help="video model / graph (default: h3)",
     )
     p_render.set_defaults(func=cmd_render)
 

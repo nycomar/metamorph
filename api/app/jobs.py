@@ -6,6 +6,7 @@ import logging
 import sqlite3
 from pathlib import Path
 
+from .config import settings
 from .pipeline.evolve import EvolutionSpec, render_evolution
 from .pipeline.stages import StageSpec, build_stages
 from .storage import project_dir, set_project_status, update_job
@@ -111,7 +112,7 @@ async def _render(conn: sqlite3.Connection, row: sqlite3.Row) -> None:
         seed=RENDER_SEED,
         loop=False,
     )
-    result = await render_evolution(images, spec, out_path)
+    result = await render_evolution(images, spec, out_path, video_model=settings.video_model)
 
     conn.execute(
         "INSERT INTO takes (project_id, label, video_path, duration_s) VALUES (?, ?, ?, ?)",

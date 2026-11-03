@@ -1,0 +1,22 @@
+[
+  {
+    "label": "Skeleton",
+    "prompt": "a white anatomical skeleton sitting on a black leather sofa, bone and gristle, studio light",
+    "weight": 1.0
+  },
+  {
+    "label": "Fossil",
+    "prompt": "a white anatomical skeleton sitting on a black leather sofa, encrusted with pale fossil stone, cracks and sediment",
+    "weight": 1.0
+  },
+  {
+    "label": "Marble",
+    "prompt": "a white anatomical skeleton sitting on a black leather sofa, carved from white marble with grey veins",
+    "weight": 1.0
+  },
+  {
+    "label": "Brass",
+    "prompt": "a white anatomical skeleton sitting on a black leather sofa, rebuilt from polished brass and copper with articulated joints",
+    "weight": 1.0
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "label": "Skeleton",
+    "prompt": "a white anatomical skeleton sitting on a black leather sofa, bone and gristle, studio light",
+    "weight": 1.0,
+    "path": "../docs/runs/skeleton-h3/stages/stage-0.png",
+    "prompt_id": "acb03732-e4fc-4bd5-93c4-a82c723bdf53",
+    "seconds": 21.5,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Fossil",
+    "prompt": "a white anatomical skeleton sitting on a black leather sofa, encrusted with pale fossil stone, cracks and sediment",
+    "weight": 1.0,
+    "path": "../docs/runs/skeleton-h3/stages/stage-1.png",
+    "prompt_id": "e5d299d5-11dd-442a-a72c-2264ee6375d2",
+    "seconds": 12.5,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Marble",
+    "prompt": "a white anatomical skeleton sitting on a black leather sofa, carved from white marble with grey veins",
+    "weight": 1.0,
+    "path": "../docs/runs/skeleton-h3/stages/stage-2.png",
+    "prompt_id": "ff489659-3594-4d8b-a8ee-25b39153340b",
+    "seconds": 12.5,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Brass",
+    "prompt": "a white anatomical skeleton sitting on a black leather sofa, rebuilt from polished brass and copper with articulated joints",
+    "weight": 1.0,
+    "path": "../docs/runs/skeleton-h3/stages/stage-3.png",
+    "prompt_id": "a87e053b-7bc3-4ad7-a9e0-e846da7d883b",
+    "seconds": 16.8,
+    "image_model": "sdxl"
+  }
+]
