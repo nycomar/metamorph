@@ -1,0 +1,24 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# runtime data
+api/data/
+data/
+*.db
+*.sqlite3
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# os
+.DS_Store
