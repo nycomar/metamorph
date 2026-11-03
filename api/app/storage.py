@@ -74,24 +74,24 @@ def _stage_payload(row: sqlite3.Row) -> dict:
     }
 
 
+def take_payload(row: sqlite3.Row) -> dict:
+    project_id = row["project_id"]
+    filename = Path(row["video_path"]).name if row["video_path"] else ""
+    return {
+        "id": row["id"],
+        "label": row["label"],
+        "url": media_url(project_id, filename) if filename else None,
+        "duration_s": row["duration_s"],
+        "picked": bool(row["picked"]),
+        "created_at": row["created_at"],
+    }
+
+
 def takes_payload(conn: sqlite3.Connection, project_id: str) -> list[dict]:
     rows = conn.execute(
         "SELECT * FROM takes WHERE project_id=? ORDER BY id", (project_id,)
     ).fetchall()
-    out = []
-    for row in rows:
-        filename = Path(row["video_path"]).name if row["video_path"] else ""
-        out.append(
-            {
-                "id": row["id"],
-                "label": row["label"],
-                "url": media_url(project_id, filename) if filename else None,
-                "duration_s": row["duration_s"],
-                "picked": bool(row["picked"]),
-                "created_at": row["created_at"],
-            }
-        )
-    return out
+    return [take_payload(row) for row in rows]
 
 
 def project_payload(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:

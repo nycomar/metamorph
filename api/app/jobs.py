@@ -51,6 +51,19 @@ def make_render_handler(conn: sqlite3.Connection):
     return handle
 
 
+def make_rerender_handler(conn: sqlite3.Connection):
+    """Re-render the video from stage images already on disk (used by re-roll)."""
+
+    async def handle(row: sqlite3.Row) -> None:
+        try:
+            await _rerender(conn, row)
+        except Exception:
+            set_project_status(conn, row["project_id"], "error")
+            raise
+
+    return handle
+
+
 async def _render(conn: sqlite3.Connection, row: sqlite3.Row) -> None:
     job_id = row["id"]
     project_id = row["project_id"]
@@ -151,3 +164,58 @@ async def _render(conn: sqlite3.Connection, row: sqlite3.Row) -> None:
     conn.commit()
     set_project_status(conn, project_id, "done")
     log.info("render job %s done -> %s", job_id, result.path)
+
+
+async def _rerender(conn: sqlite3.Connection, row: sqlite3.Row) -> None:
+    """Render from existing stage-*.png files without regenerating stage images."""
+    job_id = row["id"]
+    project_id = row["project_id"]
+
+    project = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+    if project is None:
+        raise RuntimeError(f"project {project_id} no longer exists")
+
+    stage_rows = conn.execute(
+        "SELECT * FROM stages WHERE project_id=? ORDER BY position", (project_id,)
+    ).fetchall()
+    stage_rows = transformation_stage_rows(stage_rows)
+    if not MIN_TRANSFORMATION_STAGES <= len(stage_rows) <= MAX_TRANSFORMATION_STAGES:
+        raise RuntimeError(
+            "re-render needs between "
+            f"{MIN_TRANSFORMATION_STAGES} and {MAX_TRANSFORMATION_STAGES} "
+            f"transformation stages, project has {len(stage_rows)}"
+        )
+
+    out_dir = project_dir(project_id)
+    # Use the stage images that actually exist. Legacy projects can have fewer
+    # files than DB rows, and a re-roll only regenerates one of them.
+    images = sorted(out_dir.glob("stage-*.png"))
+    if not 2 <= len(images) <= 6:
+        raise RuntimeError(
+            f"re-render needs 2-6 stage images on disk, found {len(images)} in {out_dir}"
+        )
+
+    set_project_status(conn, project_id, "rendering")
+    update_job(conn, job_id, state="running", progress=0.15, detail="rendering video")
+
+    take_index = conn.execute(
+        "SELECT COUNT(*) FROM takes WHERE project_id=?", (project_id,)
+    ).fetchone()[0]
+    out_path = out_dir / f"take-{take_index}.mp4"
+    spec = EvolutionSpec(
+        frames=RENDER_FRAMES,
+        width=RENDER_WIDTH,
+        height=RENDER_HEIGHT,
+        seed=RENDER_SEED,
+        loop=False,
+    )
+    update_job(conn, job_id, state="running", progress=0.4, detail="rendering video")
+    result = await render_evolution(images, spec, out_path, video_model=settings.video_model)
+
+    conn.execute(
+        "INSERT INTO takes (project_id, label, video_path, duration_s) VALUES (?, ?, ?, ?)",
+        (project_id, f"take {take_index}", str(result.path), result.duration_s),
+    )
+    conn.commit()
+    set_project_status(conn, project_id, "done")
+    log.info("re-render job %s done -> %s", job_id, result.path)

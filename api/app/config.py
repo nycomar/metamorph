@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     request_timeout_s: float = 120.0
     image_model: str = "sdxl"
     video_model: str = "h3"
+    render_per_ip_hour: int = 3
+    render_global_day: int = 40
 
     @classmethod
     def load(cls) -> "Settings":

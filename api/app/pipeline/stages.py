@@ -111,6 +111,7 @@ async def build_stages(
     tuning: StageTuning | None = None,
     only_index: int | None = None,
     image_model: str | None = None,
+    seed: int | None = None,
 ) -> list[Path]:
     """Copy the source to ``stage-0.png``, then generate one PNG per transformation.
 
@@ -127,7 +128,8 @@ async def build_stages(
     ``stages``) while keeping its ``stage-{index + 1}.png`` filename; the source
     copy is still written.
     ``image_model`` picks ``stage.json`` (``sdxl``) or ``stage_flux.json``
-    (``flux``); ``None`` uses the configured default.
+    (``flux``); ``None`` uses the configured default. ``seed`` overrides the
+    graph's sampler seed (used when re-rolling a single stage).
     """
     if not MIN_TRANSFORMATION_STAGES <= len(stages) <= MAX_TRANSFORMATION_STAGES:
         raise ValueError(
@@ -175,7 +177,7 @@ async def build_stages(
         prompt = f"{stage.prompt}{STAGE_PROMPT_SUFFIX}"
         wf = override(workflow, model.source, "image", src_name)
         wf = override(wf, model.positive, "text", prompt)
-        wf = override(wf, model.sampler, "seed", STAGE_SEED)
+        wf = override(wf, model.sampler, "seed", STAGE_SEED if seed is None else seed)
         wf = override(wf, model.save, "filename_prefix", f"metamorph/stage_{i}")
         if tuning is not None:
             if tuning.denoise is not None:

@@ -47,8 +47,16 @@ CREATE TABLE IF NOT EXISTS takes (
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS render_events (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip            TEXT NOT NULL,
+  created_at    REAL NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_jobs_project ON jobs(project_id);
 CREATE INDEX IF NOT EXISTS idx_stages_project ON stages(project_id);
+CREATE INDEX IF NOT EXISTS idx_render_events_time ON render_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_render_events_ip_time ON render_events(ip, created_at);
 """
 
 

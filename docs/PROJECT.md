@@ -62,11 +62,26 @@ Both use the shared `CloudClient` (`api/app/cloud.py`) — no direct HTTP from p
 | GET | `/api/projects/{id}` | project, stages, takes, status |
 | PUT | `/api/projects/{id}/stages` | replace transformation stage list (1–5, order matters) |
 | POST | `/api/projects/{id}/render` | queue a render → `{job_id}` |
-| POST | `/api/projects/{id}/stages/{pos}/reroll` | regenerate one stage, then re-render |
+| POST | `/api/projects/{id}/stages/{pos}/reroll` | regenerate only stage `pos` (1..N, new seed), then queue a re-render → `{job_id}` |
 | GET | `/api/jobs/{job_id}/events` | SSE progress stream |
-| POST | `/api/takes/{take_id}/pick` | mark the chosen take |
-| GET | `/api/projects/{id}/export?format=916\|169\|webp` | download |
-| GET | `/api/gallery` | finished evolutions |
+| POST | `/api/takes/{take_id}/pick` | mark the chosen take (clears `picked` on siblings) → take |
+| GET | `/api/projects/{id}/export?format=916\|169\|webp` | download the picked take (or take 0) as `video/mp4` or `image/webp` |
+| GET | `/api/gallery` | projects with a take, newest first → `{projects:[{id, created_at, thumbnail_url, take_url, duration_s}]}` |
+
+Exports are cached per project in `export-916.mp4`, `export-169.mp4` and
+`export.webp`, and re-encoded only when the source take is newer. The same files
+are also served at `/media/{id}/<name>`. Gallery thumbnails are `thumb.jpg`
+(first frame, generated once). Re-roll positions are **1..N over the user's
+transformation stages**; position `0` is `stage-0.png`, the source copy, and is
+rejected.
+
+Render admission is limited to **3 per IP per hour** and **40 globally per
+24h** (`RENDER_PER_IP_HOUR`, `RENDER_GLOBAL_DAY`). The check runs before
+anything is submitted to Cloud. When a limit is hit the API returns HTTP `429`:
+
+```json
+{"error": "render limit reached: 3 per hour from this IP", "retry_after_s": 2431}
+```
 
 ### 4. SSE event shape
 
@@ -88,7 +103,8 @@ api/data/projects/{project_id}/
   source.png
   stage-0.png … stage-N.png
   take-0.mp4 / take-1.mp4
-  export-916.mp4 / export-169.mp4 / loop.webp
+  export-916.mp4 / export-169.mp4 / export.webp
+  thumb.jpg
 ```
 
 ## Tickets
