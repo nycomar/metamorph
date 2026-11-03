@@ -637,8 +637,8 @@ export default function App() {
               </span>
             </div>
             <div className="mt-1">
-              nodes: <span className="tabular-nums text-white/70">{meta?.nodes_total?.toLocaleString() ?? "—"}</span>
-              {meta ? ` · LTX ${meta.ltx_nodes}` : ""}
+              {meta ? `video: ${meta.video_model_label} · images: ${meta.image_model_label} · ` : ""}
+              <span className="tabular-nums text-white/70">{meta?.nodes_total?.toLocaleString() ?? "—"}</span> nodes
             </div>
           </div>
         </header>

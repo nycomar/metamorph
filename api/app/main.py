@@ -88,14 +88,29 @@ async def health() -> dict:
     return out
 
 
+_VIDEO_MODEL_LABELS = {"h3": "MiniMax H3", "ltx": "LTX-2.5"}
+_IMAGE_MODEL_LABELS = {"sdxl": "SDXL", "flux": "FLUX.1 dev"}
+
+
 @app.get("/api/meta")
 async def meta() -> dict:
     try:
         info = await cloud.object_info()
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=str(exc)[:300]) from exc
-    ltx = sorted(k for k in info if k.startswith("LTX"))
-    return {"nodes_total": len(info), "ltx_nodes": len(ltx), "has_ltx_keyframer": "LTXKeyframer" in info}
+    ltx_nodes = sum(1 for k in info if k.startswith("LTX"))
+    h3_nodes = sum(1 for k in info if "MiniMaxH3" in k)
+    video_model = settings.video_model
+    image_model = settings.image_model
+    return {
+        "nodes_total": len(info),
+        "video_model": video_model,
+        "video_model_label": _VIDEO_MODEL_LABELS.get(video_model, video_model),
+        "image_model": image_model,
+        "image_model_label": _IMAGE_MODEL_LABELS.get(image_model, image_model),
+        "ltx_nodes": ltx_nodes,
+        "h3_nodes": h3_nodes,
+    }
 
 
 @app.get("/api/projects")

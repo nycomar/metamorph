@@ -4,7 +4,15 @@ export type Health = {
   cloud?: { status?: string; account?: string; error?: string };
 };
 
-export type Meta = { nodes_total: number; ltx_nodes: number; has_ltx_keyframer: boolean };
+export type Meta = {
+  nodes_total: number;
+  video_model: string;
+  video_model_label: string;
+  image_model: string;
+  image_model_label: string;
+  ltx_nodes: number;
+  h3_nodes: number;
+};
 
 export type StageInput = { label: string; prompt: string; weight: number };
 
