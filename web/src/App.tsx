@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -14,25 +14,90 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { api, type Health, type Meta } from "./api";
+import {
+  api,
+  type ApiStage,
+  type Health,
+  type Job,
+  type Meta,
+  type StageInput,
+  type Take,
+} from "./api";
 
-type Stage = { id: string; label: string; prompt: string; seconds: number };
+type Stage = { id: string; label: string; prompt: string; weight: number };
+
+type RenderState = {
+  jobId: string;
+  state: string;
+  progress: number;
+  detail: string;
+  error: string | null;
+};
+
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 const DEFAULT_STAGES: Stage[] = [
-  { id: "s1", label: "Metal ring", prompt: "a polished metal ring on dark stone, studio light", seconds: 1.4 },
-  { id: "s2", label: "Living plant", prompt: "the same ring has become living plant matter, roots spreading", seconds: 1.6 },
-  { id: "s3", label: "Organic flesh", prompt: "the same shape turns to organic flesh, wet and breathing", seconds: 1.6 },
-  { id: "s4", label: "Mechanical organism", prompt: "the same form becomes a mechanical organism, brass and steel", seconds: 1.4 },
+  { id: "s1", label: "Metal ring", prompt: "a polished metal ring on dark stone, studio light", weight: 1.0 },
+  { id: "s2", label: "Living plant", prompt: "the same ring has become living plant matter, roots spreading", weight: 1.0 },
+  { id: "s3", label: "Organic flesh", prompt: "the same shape turns to organic flesh, wet and breathing", weight: 1.0 },
+  { id: "s4", label: "Mechanical organism", prompt: "the same form becomes a mechanical organism, brass and steel", weight: 1.0 },
 ];
+
+const ACTIVE_RENDER_STATES = new Set(["queued", "running"]);
+
+function isStagesValid(list: Stage[]): boolean {
+  return (
+    list.length > 0 &&
+    list.every((stage) => stage.label.trim() !== "" && stage.prompt.trim() !== "")
+  );
+}
+
+function toStage(stage: ApiStage): Stage {
+  return {
+    id: String(stage.id),
+    label: stage.label,
+    prompt: stage.prompt,
+    weight: stage.weight,
+  };
+}
+
+function toInput(stage: Stage): StageInput {
+  return { label: stage.label.trim(), prompt: stage.prompt.trim(), weight: stage.weight };
+}
+
+function renderFromJob(job: Job): RenderState {
+  return {
+    jobId: job.id,
+    state: job.state,
+    progress: job.progress,
+    detail: job.detail ?? "",
+    error: job.error,
+  };
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function eventData<T extends { state?: string }>(event: Event): T | null {
+  if (!(event instanceof MessageEvent) || typeof event.data !== "string") return null;
+  try {
+    return JSON.parse(event.data) as T;
+  } catch {
+    return null;
+  }
+}
 
 function StageCard({
   stage,
   index,
+  removable,
   onChange,
   onRemove,
 }: {
   stage: Stage;
   index: number;
+  removable: boolean;
   onChange: (s: Stage) => void;
   onRemove: () => void;
 }) {
@@ -60,18 +125,24 @@ function StageCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-xs uppercase tracking-widest text-amber-300/80">Stage {index + 1}</span>
-            <button onClick={onRemove} className="text-xs text-white/35 hover:text-red-300">
+            <button
+              onClick={onRemove}
+              disabled={!removable}
+              className="text-xs text-white/35 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+            >
               remove
             </button>
           </div>
           <input
             value={stage.label}
             onChange={(e) => onChange({ ...stage, label: e.target.value })}
+            aria-label={`Stage ${index + 1} label`}
             className="mt-1 w-full bg-transparent text-lg font-semibold text-white outline-none"
           />
           <textarea
             value={stage.prompt}
             onChange={(e) => onChange({ ...stage, prompt: e.target.value })}
+            aria-label={`Stage ${index + 1} prompt`}
             rows={2}
             className="mt-1 w-full resize-none bg-transparent text-sm text-white/65 outline-none"
           />
@@ -83,11 +154,11 @@ function StageCard({
                 min={0.4}
                 max={2}
                 step={0.1}
-                value={stage.seconds}
-                onChange={(e) => onChange({ ...stage, seconds: Number(e.target.value) })}
+                value={stage.weight}
+                onChange={(e) => onChange({ ...stage, weight: Number(e.target.value) })}
                 className="accent-amber-400"
               />
-              <span className="tabular-nums text-white/70">{stage.seconds.toFixed(1)}s</span>
+              <span className="tabular-nums text-white/70">{stage.weight.toFixed(2)}×</span>
             </label>
           </div>
         </div>
@@ -97,19 +168,209 @@ function StageCard({
 }
 
 export default function App() {
+  const [initialProjectId] = useState(() => new URLSearchParams(window.location.search).get("project"));
+  const [projectId, setProjectId] = useState<string | null>(initialProjectId);
+  const [projectTitle, setProjectTitle] = useState<string | null>(null);
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [stages, setStages] = useState<Stage[]>(DEFAULT_STAGES);
+  const [takes, setTakes] = useState<Take[]>([]);
+  const [pickedTake, setPickedTake] = useState<number | null>(null);
+  const [render, setRender] = useState<RenderState | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [streamNote, setStreamNote] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState(Boolean(initialProjectId));
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const stageListRef = useRef(stages);
+  const saveTimerRef = useRef<number | null>(null);
+  const saveSeqRef = useRef(0);
+  const hydratingRef = useRef(false);
+  const streamRef = useRef<EventSource | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   useEffect(() => {
-    api.health().then(setHealth).catch((e) => setError(String(e)));
+    stageListRef.current = stages;
+  }, [stages]);
+
+  useEffect(() => {
+    api.health().then(setHealth).catch((e) => setError(messageOf(e)));
     api.meta().then(setMeta).catch(() => undefined);
   }, []);
 
-  const total = useMemo(() => stages.reduce((a, s) => a + s.seconds, 0), [stages]);
+  useEffect(() => {
+    return () => {
+      streamRef.current?.close();
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
+  const openStream = useCallback((jobId: string, initial?: RenderState) => {
+    streamRef.current?.close();
+    setStreamNote(null);
+    setRender(initial ?? { jobId, state: "queued", progress: 0, detail: "queued", error: null });
+
+    const source = new EventSource(`/api/jobs/${encodeURIComponent(jobId)}/events`);
+    streamRef.current = source;
+
+    source.onopen = () => setStreamNote(null);
+
+    source.addEventListener("progress", (event) => {
+      const data = eventData<{ state: string; progress: number; detail: string }>(event);
+      if (!data) return;
+      setStreamNote(null);
+      setRender({
+        jobId,
+        state: data.state,
+        progress: typeof data.progress === "number" ? data.progress : 0,
+        detail: data.detail ?? "",
+        error: null,
+      });
+    });
+
+    source.addEventListener("done", (event) => {
+      const data = eventData<{ state: string; takes: Take[] }>(event);
+      if (data?.takes) {
+        setTakes(data.takes);
+        setPickedTake((current) => {
+          const stillThere = data.takes.some((take) => take.id === current);
+          return stillThere ? current : (data.takes[0]?.id ?? null);
+        });
+      }
+      setRender({ jobId, state: "done", progress: 1, detail: "done", error: null });
+      setStreamNote(null);
+      source.close();
+      if (streamRef.current === source) streamRef.current = null;
+    });
+
+    source.addEventListener("error", (event) => {
+      const data = eventData<{ state: string; error?: string }>(event);
+      if (data) {
+        const message = data.error || "render failed";
+        setRender({ jobId, state: "error", progress: 0, detail: "", error: message });
+        setStreamNote(null);
+        source.close();
+        if (streamRef.current === source) streamRef.current = null;
+      } else {
+        setStreamNote("Connection lost — retrying…");
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!initialProjectId) {
+      setReady(true);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    api
+      .getProject(initialProjectId)
+      .then((project) => {
+        if (cancelled) return;
+        hydratingRef.current = true;
+        setProjectId(project.id);
+        setProjectTitle(project.title);
+        setStages(project.stages.map(toStage));
+        setSourceUrl(project.source_url);
+        setTakes(project.takes);
+        setPickedTake(project.takes.find((take) => take.picked)?.id ?? project.takes[0]?.id ?? null);
+        setSaveState("idle");
+        setError(null);
+        setReady(true);
+        setLoading(false);
+
+        if (project.job) {
+          const restored = renderFromJob(project.job);
+          setRender(restored);
+          if (ACTIVE_RENDER_STATES.has(project.job.state)) openStream(project.job.id, restored);
+        } else {
+          setRender(null);
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(`Could not load project ${initialProjectId}: ${messageOf(e)}`);
+        setProjectId(null);
+        setProjectTitle(null);
+        setSourceUrl(null);
+        setTakes([]);
+        setRender(null);
+        setSaveState("idle");
+        setReady(true);
+        setLoading(false);
+        history.replaceState(null, "", window.location.pathname);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialProjectId, openStream]);
+
+  const persistStages = useCallback(async (id: string, list: Stage[]): Promise<boolean> => {
+    if (!isStagesValid(list)) return false;
+    const seq = ++saveSeqRef.current;
+    setSaveState("saving");
+    try {
+      await api.putStages(id, list.map(toInput));
+      if (seq === saveSeqRef.current) setSaveState("saved");
+      return true;
+    } catch (e) {
+      if (seq === saveSeqRef.current) {
+        setSaveState("error");
+        setError(messageOf(e));
+      }
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !projectId) return;
+    if (hydratingRef.current) {
+      hydratingRef.current = false;
+      return;
+    }
+    if (!isStagesValid(stages)) {
+      setSaveState("idle");
+      return;
+    }
+
+    if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      void persistStages(projectId, stages);
+    }, 700);
+
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [stages, projectId, ready, persistStages]);
+
+  const totalWeight = useMemo(() => stages.reduce((sum, stage) => sum + stage.weight, 0), [stages]);
+  const invalidStages = !isStagesValid(stages);
+  const renderActive = render !== null && ACTIVE_RENDER_STATES.has(render.state);
+  const selectedTake = takes.find((take) => take.id === pickedTake) ?? takes[0] ?? null;
+
+  async function flushSave(): Promise<boolean> {
+    if (!projectId) return true;
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    return persistStages(projectId, stageListRef.current);
+  }
 
   function onDragEnd(e: DragEndEvent) {
     const { active, over } = e;
@@ -119,6 +380,78 @@ export default function App() {
       const to = items.findIndex((i) => i.id === over.id);
       return arrayMove(items, from, to);
     });
+  }
+
+  async function uploadFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setError("That file is not an image. Choose a PNG, JPG or WebP.");
+      return;
+    }
+    if (!isStagesValid(stages)) {
+      setError("Every stage needs a label and prompt before uploading.");
+      return;
+    }
+
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    saveSeqRef.current += 1;
+    streamRef.current?.close();
+    streamRef.current = null;
+
+    setUploading(true);
+    setError(null);
+    setStreamNote(null);
+
+    try {
+      const project = await api.createProject(file, stages.map(toInput));
+      hydratingRef.current = true;
+      setProjectId(project.id);
+      setProjectTitle(project.title);
+      setStages(project.stages.map(toStage));
+      setSourceUrl(project.source_url);
+      setTakes(project.takes);
+      setPickedTake(project.takes[0]?.id ?? null);
+      setRender(project.job ? renderFromJob(project.job) : null);
+      setSaveState("saved");
+      setReady(true);
+      history.replaceState(null, "", `?project=${encodeURIComponent(project.id)}`);
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function onEvolve() {
+    if (!projectId) {
+      setError("Upload a source photo first.");
+      return;
+    }
+    if (stageListRef.current.length !== 4) {
+      setError(`Render needs exactly 4 stages — this project has ${stageListRef.current.length}.`);
+      return;
+    }
+    if (!isStagesValid(stageListRef.current)) {
+      setError("Every stage needs a label and prompt before rendering.");
+      return;
+    }
+
+    setError(null);
+    setStreamNote(null);
+    const saved = await flushSave();
+    if (!saved) return;
+
+    try {
+      setRender({ jobId: "", state: "queued", progress: 0, detail: "queued", error: null });
+      const { job_id } = await api.renderProject(projectId);
+      openStream(job_id);
+    } catch (e) {
+      const message = messageOf(e);
+      setError(message);
+      setRender({ jobId: "", state: "error", progress: 0, detail: "", error: message });
+    }
   }
 
   return (
@@ -148,19 +481,95 @@ export default function App() {
 
         {error && (
           <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            {error}
+            <div className="flex items-start justify-between gap-4">
+              <span className="whitespace-pre-wrap break-words">{error}</span>
+              <button onClick={() => setError(null)} className="shrink-0 text-xs text-red-200/60 hover:text-red-100">
+                dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          <div className="mt-6 rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-sm text-amber-100/80">
+            Loading project {initialProjectId}…
           </div>
         )}
 
         <main className="mt-8 grid gap-8 lg:grid-cols-[1.15fr_1fr]">
           <section>
-            <div className="flex items-center justify-between">
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) void uploadFile(file);
+              }}
+              className={[
+                "flex items-center gap-4 rounded-xl border border-dashed px-4 py-3 transition",
+                dragOver
+                  ? "border-amber-300/70 bg-amber-400/10"
+                  : "border-white/15 bg-white/[0.02] hover:border-white/25",
+              ].join(" ")}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void uploadFile(file);
+                }}
+              />
+              {sourceUrl ? (
+                <img src={sourceUrl} alt="Source" className="h-16 w-16 rounded-lg border border-white/10 object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-white/10 text-2xl text-amber-300/70">
+                  ↑
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-white/85">
+                  {uploading ? "Uploading…" : sourceUrl ? "Source photo" : "Drop a photo to start"}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-white/45">
+                  {projectId ? (
+                    <>
+                      project {projectId.slice(0, 10)}…{projectTitle ? ` · ${projectTitle}` : ""}
+                    </>
+                  ) : (
+                    "PNG, JPG or WebP · uploads start a new project"
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:border-amber-300/60 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {sourceUrl ? "Replace" : "Choose file"}
+              </button>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between">
               <h2 className="text-sm uppercase tracking-widest text-white/50">Evolution chain</h2>
               <button
                 onClick={() =>
                   setStages((s) => [
                     ...s,
-                    { id: `s${crypto.randomUUID()}`, label: "New stage", prompt: "", seconds: 1.2 },
+                    {
+                      id: `s${crypto.randomUUID()}`,
+                      label: "New stage",
+                      prompt: "describe the next form, keeping the same silhouette",
+                      weight: 1.0,
+                    },
                   ])
                 }
                 className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:border-amber-300/60 hover:text-amber-200"
@@ -177,6 +586,7 @@ export default function App() {
                       key={stage.id}
                       stage={stage}
                       index={i}
+                      removable={stages.length > 1}
                       onChange={(next) => setStages((all) => all.map((s) => (s.id === stage.id ? next : s)))}
                       onRemove={() => setStages((all) => all.filter((s) => s.id !== stage.id))}
                     />
@@ -185,25 +595,123 @@ export default function App() {
               </SortableContext>
             </DndContext>
 
-            <div className="mt-4 flex items-center justify-between text-xs text-white/45">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-white/45">
               <span>
-                {stages.length} stages · <span className="tabular-nums">{total.toFixed(1)}s</span> total
+                {stages.length} stages · <span className="tabular-nums">{totalWeight.toFixed(1)}</span> total weight
+                {saveState === "saving" && <span className="ml-2 text-amber-300/80">saving…</span>}
+                {saveState === "saved" && <span className="ml-2 text-emerald-400">saved</span>}
+                {saveState === "error" && <span className="ml-2 text-red-300">save failed</span>}
               </span>
-              <span>3–5 stages is the sweet spot</span>
+              <span className={invalidStages ? "text-red-300" : undefined}>
+                {invalidStages ? "every stage needs a label and prompt" : "4 stages required to render"}
+              </span>
             </div>
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-            <h2 className="text-sm uppercase tracking-widest text-white/50">Preview</h2>
-            <div className="mt-4 flex aspect-[9/16] max-h-[420px] items-center justify-center rounded-xl border border-dashed border-white/15 bg-black/40 text-sm text-white/35">
-              your metamorphosis lands here
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-sm uppercase tracking-widest text-white/50">Preview</h2>
+              {projectId && <span className="text-xs text-white/30">{projectId.slice(0, 8)}…</span>}
             </div>
+
+            {render && ACTIVE_RENDER_STATES.has(render.state) && (
+              <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
+                <div className="flex items-center justify-between text-xs text-amber-100/80">
+                  <span>{render.state === "queued" ? "queued" : "evolving"}</span>
+                  <span className="tabular-nums">{Math.round(Math.max(0, Math.min(1, render.progress)) * 100)}%</span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-amber-400 transition-all"
+                    style={{ width: `${Math.max(0, Math.min(1, render.progress)) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-2 truncate text-xs text-white/55">{render.detail || "waiting for the worker…"}</p>
+                {streamNote && <p className="mt-1 text-xs text-amber-300/80">{streamNote}</p>}
+              </div>
+            )}
+
+            {render?.error && (
+              <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                <p className="whitespace-pre-wrap break-words">{render.error}</p>
+              </div>
+            )}
+
+            {takes.length > 0 ? (
+              <div className="mt-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {takes.map((take) => {
+                    const selected = selectedTake?.id === take.id;
+                    return (
+                      <button
+                        key={take.id}
+                        type="button"
+                        onClick={() => setPickedTake(take.id)}
+                        aria-pressed={selected}
+                        className={[
+                          "overflow-hidden rounded-xl border text-left transition",
+                          selected
+                            ? "border-amber-400/80 ring-2 ring-amber-400/30"
+                            : "border-white/10 hover:border-white/30",
+                        ].join(" ")}
+                      >
+                        {take.url ? (
+                          <video
+                            src={take.url}
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                            className="aspect-[9/16] w-full bg-black object-cover"
+                          />
+                        ) : (
+                          <div className="flex aspect-[9/16] w-full items-center justify-center bg-black/40 text-xs text-white/35">
+                            no video
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
+                          <span className="truncate text-white/60">
+                            {take.label}
+                            {take.duration_s ? ` · ${take.duration_s.toFixed(1)}s` : ""}
+                          </span>
+                          {selected && <span className="shrink-0 text-amber-300">selected</span>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {render?.state === "done" && (
+                  <p className="mt-3 text-xs text-emerald-400/80">
+                    render complete · {takes.length} {takes.length === 1 ? "take" : "takes"}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4 flex aspect-[9/16] max-h-[420px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/15 bg-black/40 text-sm text-white/35">
+                {sourceUrl ? (
+                  <img src={sourceUrl} alt="Source preview" className="h-full w-full object-contain" />
+                ) : (
+                  "your metamorphosis lands here"
+                )}
+              </div>
+            )}
+
             <button
-              disabled
-              className="mt-5 w-full cursor-not-allowed rounded-xl bg-amber-400/20 px-4 py-3 text-sm font-semibold text-amber-200/60"
-              title="The render pipeline lands next"
+              onClick={() => void onEvolve()}
+              disabled={!projectId || uploading || renderActive}
+              className={[
+                "mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold transition",
+                !projectId || uploading || renderActive
+                  ? "cursor-not-allowed bg-amber-400/20 text-amber-200/60"
+                  : "bg-amber-400 text-black hover:bg-amber-300",
+              ].join(" ")}
+              title={!projectId ? "Upload a source photo first" : undefined}
             >
-              Evolve · 2 takes
+              {renderActive
+                ? `Evolving · ${Math.round(Math.max(0, Math.min(1, render?.progress ?? 0)) * 100)}%`
+                : takes.length > 0
+                  ? "Evolve again · 2 takes"
+                  : "Evolve · 2 takes"}
             </button>
             <p className="mt-3 text-xs text-white/35">
               Stage images are guides inside one generation — the frames between them are generated, not stitched.
