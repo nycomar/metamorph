@@ -36,12 +36,22 @@ type RenderState = {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-const DEFAULT_STAGES: Stage[] = [
-  { id: "s1", label: "Metal ring", prompt: "a polished metal ring on dark stone, studio light", weight: 1.0 },
-  { id: "s2", label: "Living plant", prompt: "the same ring has become living plant matter, roots spreading", weight: 1.0 },
-  { id: "s3", label: "Organic flesh", prompt: "the same shape turns to organic flesh, wet and breathing", weight: 1.0 },
-  { id: "s4", label: "Mechanical organism", prompt: "the same form becomes a mechanical organism, brass and steel", weight: 1.0 },
-];
+const MIN_STAGES = 2;
+const MAX_STAGES = 6;
+
+function objectPhrase(description: string): string {
+  return description.trim().replace(/^(?:an?|the)\s+/i, "");
+}
+
+function buildStarterStages(description: string): Stage[] {
+  const object = objectPhrase(description);
+  return [
+    { id: `s${crypto.randomUUID()}`, label: "Original", prompt: `a ${object}, unchanged, studio light`, weight: 1.0 },
+    { id: `s${crypto.randomUUID()}`, label: "Moss", prompt: `a ${object} overgrown with living moss and vines, wet organic texture`, weight: 1.0 },
+    { id: `s${crypto.randomUUID()}`, label: "Flesh", prompt: `a ${object} turned to pale wet muscle tissue, veins and pores`, weight: 1.0 },
+    { id: `s${crypto.randomUUID()}`, label: "Machine", prompt: `a ${object} rebuilt from brass gears, copper coils and steel cables`, weight: 1.0 },
+  ];
+}
 
 const ACTIVE_RENDER_STATES = new Set(["queued", "running"]);
 
@@ -128,6 +138,7 @@ function StageCard({
             <button
               onClick={onRemove}
               disabled={!removable}
+              title={!removable ? `${MIN_STAGES}–${MAX_STAGES} stages` : undefined}
               className="text-xs text-white/35 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
             >
               remove
@@ -172,7 +183,8 @@ export default function App() {
   const [projectId, setProjectId] = useState<string | null>(initialProjectId);
   const [projectTitle, setProjectTitle] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
-  const [stages, setStages] = useState<Stage[]>(DEFAULT_STAGES);
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [description, setDescription] = useState("");
   const [takes, setTakes] = useState<Take[]>([]);
   const [pickedTake, setPickedTake] = useState<number | null>(null);
   const [render, setRender] = useState<RenderState | null>(null);
@@ -362,6 +374,16 @@ export default function App() {
   const invalidStages = !isStagesValid(stages);
   const renderActive = render !== null && ACTIVE_RENDER_STATES.has(render.state);
   const selectedTake = takes.find((take) => take.id === pickedTake) ?? takes[0] ?? null;
+  const stageCountValid = stages.length >= MIN_STAGES && stages.length <= MAX_STAGES;
+
+  const evolveBlocker = useMemo(() => {
+    if (stages.length === 0) return "Describe the object to build a starter chain.";
+    if (!sourceUrl) return "Upload a source photo first.";
+    if (stages.length < MIN_STAGES) return `Add at least ${MIN_STAGES} stages to evolve.`;
+    if (stages.length > MAX_STAGES) return `Keep the chain to ${MAX_STAGES} stages or fewer.`;
+    if (invalidStages) return "Every stage needs a label and prompt.";
+    return null;
+  }, [stages.length, sourceUrl, invalidStages]);
 
   async function flushSave(): Promise<boolean> {
     if (!projectId) return true;
@@ -370,6 +392,13 @@ export default function App() {
       saveTimerRef.current = null;
     }
     return persistStages(projectId, stageListRef.current);
+  }
+
+  function seedChain() {
+    const value = description.trim();
+    if (!value) return;
+    setStages(buildStarterStages(value));
+    setError(null);
   }
 
   function onDragEnd(e: DragEndEvent) {
@@ -385,6 +414,14 @@ export default function App() {
   async function uploadFile(file: File) {
     if (!file.type.startsWith("image/")) {
       setError("That file is not an image. Choose a PNG, JPG or WebP.");
+      return;
+    }
+    if (stages.length === 0) {
+      setError("Describe the object first — that seeds your evolution chain.");
+      return;
+    }
+    if (stages.length < MIN_STAGES || stages.length > MAX_STAGES) {
+      setError(`A project needs between ${MIN_STAGES} and ${MAX_STAGES} stages.`);
       return;
     }
     if (!isStagesValid(stages)) {
@@ -429,8 +466,8 @@ export default function App() {
       setError("Upload a source photo first.");
       return;
     }
-    if (stageListRef.current.length < 2 || stageListRef.current.length > 6) {
-      setError(`Render needs 2-6 stages — this project has ${stageListRef.current.length}.`);
+    if (stageListRef.current.length < MIN_STAGES || stageListRef.current.length > MAX_STAGES) {
+      setError(`Render needs ${MIN_STAGES}-${MAX_STAGES} stages — this project has ${stageListRef.current.length}.`);
       return;
     }
     if (!isStagesValid(stageListRef.current)) {
@@ -560,52 +597,101 @@ export default function App() {
 
             <div className="mt-6 flex items-center justify-between">
               <h2 className="text-sm uppercase tracking-widest text-white/50">Evolution chain</h2>
-              <button
-                onClick={() =>
-                  setStages((s) => [
-                    ...s,
-                    {
-                      id: `s${crypto.randomUUID()}`,
-                      label: "New stage",
-                      prompt: "describe the next form, keeping the same silhouette",
-                      weight: 1.0,
-                    },
-                  ])
-                }
-                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:border-amber-300/60 hover:text-amber-200"
+              {stages.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-white/35">
+                    {MIN_STAGES}–{MAX_STAGES} stages
+                  </span>
+                  <button
+                    onClick={() =>
+                      setStages((s) => [
+                        ...s,
+                        {
+                          id: `s${crypto.randomUUID()}`,
+                          label: "New stage",
+                          prompt: "describe the next form, keeping the same silhouette",
+                          weight: 1.0,
+                        },
+                      ])
+                    }
+                    disabled={stages.length >= MAX_STAGES}
+                    title={stages.length >= MAX_STAGES ? `${MIN_STAGES}–${MAX_STAGES} stages` : undefined}
+                    className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/70 hover:border-amber-300/60 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-white/15 disabled:hover:text-white/70"
+                  >
+                    add stage
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {stages.length === 0 ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  seedChain();
+                }}
+                className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-5"
               >
-                add stage
-              </button>
-            </div>
+                <label htmlFor="object-description" className="text-sm font-medium text-white/85">
+                  What is this object?
+                </label>
+                <p className="mt-1 text-xs text-white/45">
+                  Describe it in a few words — we'll build a starter chain you can rewrite.
+                </p>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    id="object-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="a white anatomical skeleton on a black leather sofa"
+                    autoFocus
+                    className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-amber-300/60"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!description.trim()}
+                    className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-black hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-amber-400/20 disabled:text-amber-200/60"
+                  >
+                    Start chain
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                  <SortableContext items={stages.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                    <ul className="mt-4 space-y-3">
+                      {stages.map((stage, i) => (
+                        <StageCard
+                          key={stage.id}
+                          stage={stage}
+                          index={i}
+                          removable={stages.length > MIN_STAGES}
+                          onChange={(next) => setStages((all) => all.map((s) => (s.id === stage.id ? next : s)))}
+                          onRemove={() => setStages((all) => all.filter((s) => s.id !== stage.id))}
+                        />
+                      ))}
+                    </ul>
+                  </SortableContext>
+                </DndContext>
 
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext items={stages.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                <ul className="mt-4 space-y-3">
-                  {stages.map((stage, i) => (
-                    <StageCard
-                      key={stage.id}
-                      stage={stage}
-                      index={i}
-                      removable={stages.length > 1}
-                      onChange={(next) => setStages((all) => all.map((s) => (s.id === stage.id ? next : s)))}
-                      onRemove={() => setStages((all) => all.filter((s) => s.id !== stage.id))}
-                    />
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
-
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-white/45">
-              <span>
-                {stages.length} stages · <span className="tabular-nums">{totalWeight.toFixed(1)}</span> total weight
-                {saveState === "saving" && <span className="ml-2 text-amber-300/80">saving…</span>}
-                {saveState === "saved" && <span className="ml-2 text-emerald-400">saved</span>}
-                {saveState === "error" && <span className="ml-2 text-red-300">save failed</span>}
-              </span>
-              <span className={invalidStages ? "text-red-300" : undefined}>
-                {invalidStages ? "every stage needs a label and prompt" : "2-6 stages required to render"}
-              </span>
-            </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-white/45">
+                  <span>
+                    {stages.length} stages · <span className="tabular-nums">{totalWeight.toFixed(1)}</span> total weight
+                    {saveState === "saving" && <span className="ml-2 text-amber-300/80">saving…</span>}
+                    {saveState === "saved" && <span className="ml-2 text-emerald-400">saved</span>}
+                    {saveState === "error" && <span className="ml-2 text-red-300">save failed</span>}
+                  </span>
+                  <span className={invalidStages || !stageCountValid ? "text-red-300" : undefined}>
+                    {!stageCountValid
+                      ? `${MIN_STAGES}–${MAX_STAGES} stages required to render`
+                      : invalidStages
+                        ? "every stage needs a label and prompt"
+                        : `${MIN_STAGES}–${MAX_STAGES} stages · ready to evolve`}
+                  </span>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
@@ -698,14 +784,14 @@ export default function App() {
 
             <button
               onClick={() => void onEvolve()}
-              disabled={!projectId || uploading || renderActive}
+              disabled={Boolean(evolveBlocker) || uploading || renderActive}
               className={[
                 "mt-5 w-full rounded-xl px-4 py-3 text-sm font-semibold transition",
-                !projectId || uploading || renderActive
+                Boolean(evolveBlocker) || uploading || renderActive
                   ? "cursor-not-allowed bg-amber-400/20 text-amber-200/60"
                   : "bg-amber-400 text-black hover:bg-amber-300",
               ].join(" ")}
-              title={!projectId ? "Upload a source photo first" : undefined}
+              title={evolveBlocker ?? (renderActive ? "Render in progress" : undefined)}
             >
               {renderActive
                 ? `Evolving · ${Math.round(Math.max(0, Math.min(1, render?.progress ?? 0)) * 100)}%`
@@ -713,6 +799,9 @@ export default function App() {
                   ? "Evolve again · 2 takes"
                   : "Evolve · 2 takes"}
             </button>
+            {evolveBlocker && !renderActive && (
+              <p className="mt-2 text-xs text-amber-200/70">{evolveBlocker}</p>
+            )}
             <p className="mt-3 text-xs text-white/35">
               Stage images are guides inside one generation — the frames between them are generated, not stitched.
             </p>
