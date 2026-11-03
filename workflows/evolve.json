@@ -1,0 +1,157 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "weight_dtype": "default" },
+    "_meta": { "title": "Load LTX-2.5 transformer" }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors", "type": "ltxv" },
+    "_meta": { "title": "Load LTX text encoder" }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "ltx-2.5-video-vae-bf16.safetensors" },
+    "_meta": { "title": "Load video VAE" }
+  },
+  "4": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "ltx-2.5-audio-vae-bf16.safetensors" },
+    "_meta": { "title": "Load audio VAE" }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "an object shaped like a ring sits centered on dark stone under soft studio light, camera locked off and static; it begins as a polished metal ring, then continuously transforms into living plant matter, then into wet organic flesh that softly breathes, then into a mechanical organism of brass and steel, always holding the same ring silhouette", "clip": ["2", 0] },
+    "_meta": { "title": "Positive prompt" }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "text, watermark, cartoon, anime, blurry, jitter, jump cut, extra objects, hands, people, low quality", "clip": ["2", 0] },
+    "_meta": { "title": "Negative prompt" }
+  },
+  "7": {
+    "class_type": "LTXVConditioning",
+    "inputs": { "positive": ["5", 0], "negative": ["6", 0], "frame_rate": 24.0 },
+    "_meta": { "title": "LTX conditioning (frame rate)" }
+  },
+  "8": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "stage_0.png" },
+    "_meta": { "title": "Guide 0 (frame 0)" }
+  },
+  "9": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "stage_1.png" },
+    "_meta": { "title": "Guide 1 (frame 1/3)" }
+  },
+  "10": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "stage_2.png" },
+    "_meta": { "title": "Guide 2 (frame 2/3)" }
+  },
+  "11": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "stage_3.png" },
+    "_meta": { "title": "Guide 3 (last frame)" }
+  },
+  "30": {
+    "class_type": "ImageScale",
+    "inputs": { "image": ["8", 0], "upscale_method": "lanczos", "width": 480, "height": 832, "crop": "center" },
+    "_meta": { "title": "Scale guide 0" }
+  },
+  "31": {
+    "class_type": "ImageScale",
+    "inputs": { "image": ["9", 0], "upscale_method": "lanczos", "width": 480, "height": 832, "crop": "center" },
+    "_meta": { "title": "Scale guide 1" }
+  },
+  "32": {
+    "class_type": "ImageScale",
+    "inputs": { "image": ["10", 0], "upscale_method": "lanczos", "width": 480, "height": 832, "crop": "center" },
+    "_meta": { "title": "Scale guide 2" }
+  },
+  "33": {
+    "class_type": "ImageScale",
+    "inputs": { "image": ["11", 0], "upscale_method": "lanczos", "width": 480, "height": 832, "crop": "center" },
+    "_meta": { "title": "Scale guide 3" }
+  },
+  "12": {
+    "class_type": "LTXVImgToVideo",
+    "inputs": { "positive": ["7", 0], "negative": ["7", 1], "vae": ["3", 0], "image": ["30", 0], "width": 480, "height": 832, "length": 49, "batch_size": 1, "strength": 1.0 },
+    "_meta": { "title": "First frame guide (img2video)" }
+  },
+  "13": {
+    "class_type": "LTXVAddGuide",
+    "inputs": { "positive": ["12", 0], "negative": ["12", 1], "vae": ["3", 0], "latent": ["12", 2], "image": ["31", 0], "frame_idx": 16, "strength": 1.0 },
+    "_meta": { "title": "Guide 1 (frame 1/3)" }
+  },
+  "14": {
+    "class_type": "LTXVAddGuide",
+    "inputs": { "positive": ["13", 0], "negative": ["13", 1], "vae": ["3", 0], "latent": ["13", 2], "image": ["32", 0], "frame_idx": 32, "strength": 1.0 },
+    "_meta": { "title": "Guide 2 (frame 2/3)" }
+  },
+  "15": {
+    "class_type": "LTXVAddGuide",
+    "inputs": { "positive": ["14", 0], "negative": ["14", 1], "vae": ["3", 0], "latent": ["14", 2], "image": ["33", 0], "frame_idx": 48, "strength": 1.0 },
+    "_meta": { "title": "Guide 3 (last frame)" }
+  },
+  "16": {
+    "class_type": "LTXVEmptyLatentAudio",
+    "inputs": { "frames_number": 49, "frame_rate": 24, "batch_size": 1, "audio_vae": ["4", 0] },
+    "_meta": { "title": "Empty audio latent" }
+  },
+  "17": {
+    "class_type": "LTXVConcatAVLatent",
+    "inputs": { "video_latent": ["15", 2], "audio_latent": ["16", 0] },
+    "_meta": { "title": "Concat video + audio latent" }
+  },
+  "18": {
+    "class_type": "LTXVDualCFGGuider",
+    "inputs": { "model": ["1", 0], "positive": ["15", 0], "negative": ["15", 1], "video_cfg": 1.0, "audio_cfg": 1.0 },
+    "_meta": { "title": "Dual CFG guider" }
+  },
+  "19": {
+    "class_type": "RandomNoise",
+    "inputs": { "noise_seed": 0 },
+    "_meta": { "title": "Noise" }
+  },
+  "20": {
+    "class_type": "ManualSigmas",
+    "inputs": { "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0" },
+    "_meta": { "title": "Distilled sigmas (8 steps)" }
+  },
+  "21": {
+    "class_type": "KSamplerSelect",
+    "inputs": { "sampler_name": "euler_ancestral" },
+    "_meta": { "title": "Sampler" }
+  },
+  "22": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": { "noise": ["19", 0], "guider": ["18", 0], "sampler": ["21", 0], "sigmas": ["20", 0], "latent_image": ["17", 0] },
+    "_meta": { "title": "Sample AV latent" }
+  },
+  "23": {
+    "class_type": "LTXVSeparateAVLatent",
+    "inputs": { "av_latent": ["22", 0] },
+    "_meta": { "title": "Separate video + audio" }
+  },
+  "24": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": { "samples": ["23", 0], "vae": ["3", 0], "tile_size": 512, "overlap": 64, "temporal_size": 64, "temporal_overlap": 8 },
+    "_meta": { "title": "Decode video" }
+  },
+  "25": {
+    "class_type": "LTXVAudioVAEDecode",
+    "inputs": { "samples": ["23", 1], "audio_vae": ["4", 0] },
+    "_meta": { "title": "Decode audio" }
+  },
+  "26": {
+    "class_type": "CreateVideo",
+    "inputs": { "images": ["24", 0], "fps": 24.0, "audio": ["25", 0] },
+    "_meta": { "title": "Create video" }
+  },
+  "27": {
+    "class_type": "SaveVideo",
+    "inputs": { "video": ["26", 0], "filename_prefix": "metamorph/take", "format": "mp4", "format.codec": "h264" },
+    "_meta": { "title": "Save video" }
+  }
+}

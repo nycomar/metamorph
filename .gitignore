@@ -22,3 +22,9 @@ data/
 
 # os
 .DS_Store
+
+# experiment artifacts (the representative final run is kept)
+docs/runs/proof/
+docs/runs/sweep/
+docs/runs/sweep2/
+docs/runs/2026*/

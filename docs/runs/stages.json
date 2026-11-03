@@ -1,0 +1,6 @@
+[
+  { "label": "Metal ring", "prompt": "a polished metal ring on dark stone, studio light, same silhouette", "weight": 1.0 },
+  { "label": "Living plant", "prompt": "the same ring has become living plant matter, roots and leaves holding the same silhouette", "weight": 1.0 },
+  { "label": "Organic flesh", "prompt": "the same shape turns to wet organic flesh, softly breathing, same silhouette", "weight": 1.0 },
+  { "label": "Mechanical organism", "prompt": "the same form becomes a mechanical organism of brass and steel, same silhouette", "weight": 1.0 }
+]
