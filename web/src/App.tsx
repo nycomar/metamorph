@@ -16,6 +16,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   api,
+  type ExportFormat,
   type Health,
   type Job,
   type Meta,
@@ -76,14 +77,20 @@ function StageCard({
   stage,
   index,
   removable,
+  rerollable,
+  rerolling,
   onChange,
   onRemove,
+  onReroll,
 }: {
   stage: Stage;
   index: number;
   removable: boolean;
+  rerollable: boolean;
+  rerolling: boolean;
   onChange: (s: Stage) => void;
   onRemove: () => void;
+  onReroll: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stage.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -109,14 +116,27 @@ function StageCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-xs uppercase tracking-widest text-amber-300/80">Transformation {index + 1}</span>
-            <button
-              onClick={onRemove}
-              disabled={!removable}
-              title={!removable ? `${MIN_STAGES}–${MAX_STAGES} transformations` : undefined}
-              className="text-xs text-white/35 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              remove
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onReroll}
+                disabled={!rerollable || rerolling}
+                title={!rerollable ? "Save the stage before re-rolling" : undefined}
+                className="flex items-center gap-1 text-xs text-white/35 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-white/35"
+              >
+                {rerolling && (
+                  <span className="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+                )}
+                evolve this again
+              </button>
+              <button
+                onClick={onRemove}
+                disabled={!removable}
+                title={!removable ? `${MIN_STAGES}–${MAX_STAGES} transformations` : undefined}
+                className="text-xs text-white/35 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                remove
+              </button>
+            </div>
           </div>
           <input
             value={stage.label}
@@ -173,6 +193,9 @@ export default function App() {
   const [loading, setLoading] = useState(Boolean(initialProjectId));
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [pickingTake, setPickingTake] = useState<number | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+  const [rerollStageId, setRerollStageId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const stageListRef = useRef(stages);
@@ -461,6 +484,93 @@ export default function App() {
     setError(null);
   }
 
+  async function onPickTake(takeId: number) {
+    if (pickingTake !== null) return;
+    setPickingTake(takeId);
+    setError(null);
+    try {
+      const picked = await api.pickTake(takeId);
+      setTakes((items) => items.map((take) => ({ ...take, picked: take.id === picked.id })));
+      setPickedTake(picked.id);
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setPickingTake(null);
+    }
+  }
+
+  async function onExport(format: ExportFormat) {
+    if (!projectId || exportingFormat !== null) return;
+    setExportingFormat(format);
+    setError(null);
+    try {
+      const { blob, filename } = await api.exportProject(projectId, format);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setExportingFormat(null);
+    }
+  }
+
+  async function onReroll(stageIndex: number) {
+    const list = stageListRef.current;
+    const stage = list[stageIndex];
+    if (!stage || renderActive) return;
+    if (!displaySourceUrl) {
+      setError("add your photo");
+      return;
+    }
+    if (!isStagesValid(list)) {
+      setError("write what it becomes for every transformation before rendering.");
+      return;
+    }
+
+    setError(null);
+    setStreamNote(null);
+
+    let id = projectId;
+    const pending = pendingPhotoRef.current;
+    if (pending) {
+      const project = await createFromPhoto(pending.file, list);
+      if (!project) return;
+      id = project.id;
+    }
+    if (!id) {
+      setError("add your photo");
+      return;
+    }
+
+    const saved = await persistStages(id, list);
+    if (!saved) return;
+
+    try {
+      setRerollStageId(stage.id);
+      setRender({
+        jobId: "",
+        state: "queued",
+        progress: 0,
+        detail: `re-rolling ${stage.label.trim() || `transformation ${stageIndex + 1}`}`,
+        error: null,
+      });
+      const { job_id } = await api.rerollStage(id, stageIndex + 1);
+      openStream(job_id);
+    } catch (e) {
+      const message = messageOf(e);
+      setError(message);
+      setRender({ jobId: "", state: "error", progress: 0, detail: "", error: message });
+    } finally {
+      setRerollStageId(null);
+    }
+  }
+
   async function onEvolve() {
     const list = stageListRef.current;
     if (!displaySourceUrl) {
@@ -517,6 +627,9 @@ export default function App() {
             </p>
           </div>
           <div className="text-right text-xs text-white/45">
+            <a href="/gallery" className="mb-2 inline-block text-amber-300/70 hover:text-amber-200">
+              gallery →
+            </a>
             <div>
               cloud:{" "}
               <span className={health?.ok ? "text-emerald-400" : "text-red-400"}>
@@ -640,8 +753,11 @@ export default function App() {
                       stage={stage}
                       index={i}
                       removable={stages.length > MIN_STAGES}
+                      rerollable={Boolean(displaySourceUrl) && isStagesValid(stages) && !renderActive && !uploading}
+                      rerolling={rerollStageId === stage.id}
                       onChange={(next) => setStages((all) => all.map((s) => (s.id === stage.id ? next : s)))}
                       onRemove={() => setStages((all) => all.filter((s) => s.id !== stage.id))}
+                      onReroll={() => void onReroll(i)}
                     />
                   ))}
                 </ul>
@@ -700,10 +816,11 @@ export default function App() {
                       <button
                         key={take.id}
                         type="button"
-                        onClick={() => setPickedTake(take.id)}
+                        onClick={() => void onPickTake(take.id)}
+                        disabled={pickingTake !== null}
                         aria-pressed={selected}
                         className={[
-                          "overflow-hidden rounded-xl border text-left transition",
+                          "overflow-hidden rounded-xl border text-left transition disabled:cursor-wait",
                           selected
                             ? "border-amber-400/80 ring-2 ring-amber-400/30"
                             : "border-white/10 hover:border-white/30",
@@ -728,12 +845,52 @@ export default function App() {
                             {take.label}
                             {take.duration_s ? ` · ${take.duration_s.toFixed(1)}s` : ""}
                           </span>
-                          {selected && <span className="shrink-0 text-amber-300">selected</span>}
+                          {pickingTake === take.id ? (
+                            <span className="shrink-0 text-amber-300/80">saving…</span>
+                          ) : (
+                            selected && <span className="shrink-0 text-amber-300">selected</span>
+                          )}
                         </div>
                       </button>
                     );
                   })}
                 </div>
+                {selectedTake && (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs uppercase tracking-widest text-white/45">Export selected take</span>
+                      {exportingFormat && (
+                        <span className="flex items-center gap-1.5 text-xs text-amber-300/80">
+                          <span className="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+                          encoding…
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {([
+                        ["916", "9:16"],
+                        ["169", "16:9"],
+                        ["webp", "WebP loop"],
+                      ] as const).map(([format, label]) => (
+                        <button
+                          key={format}
+                          type="button"
+                          onClick={() => void onExport(format)}
+                          disabled={exportingFormat !== null || pickingTake !== null}
+                          className="flex items-center justify-center gap-1.5 rounded-lg border border-white/15 px-2 py-2 text-xs text-white/70 transition hover:border-amber-300/60 hover:text-amber-200 disabled:cursor-wait disabled:opacity-40"
+                        >
+                          {exportingFormat === format && (
+                            <span className="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+                          )}
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-white/30">
+                      One encode at a time — the first export of a take can take a minute.
+                    </p>
+                  </div>
+                )}
                 {render?.state === "done" && (
                   <p className="mt-3 text-xs text-emerald-400/80">
                     render complete · {takes.length} {takes.length === 1 ? "take" : "takes"}
