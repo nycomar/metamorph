@@ -12,7 +12,7 @@ Upload one photo of an object, name its evolutionary stages, get back **one cont
 source photo
   → anchors: depth + edges (DepthAnythingV3, Canny)
   → N stage images: img2img + ControlNet(depth/edge) + IPAdapter(source)
-  → guides pinned at frames 0, 1/3, 2/3, end  (LTXKeyframer / LTXVAddGuide)
+  → guides pinned at evenly spaced frames, first to last  (LTXVKeyframer / LTXVAddGuide)
   → one LTX-2.5 pass (video + audio, 24 fps, context windows for loop)
   → continuous morph video → 9:16 / 16:9 / looping WebP
 ```

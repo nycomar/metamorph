@@ -1,0 +1,25 @@
+2026-11-02 23:36:53,658 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/upload/image "HTTP/1.1 200 OK"
+2026-11-02 23:36:53,660 INFO cloud POST /api/upload/image -> HTTP 200 {"name":"c78a6184b93b754418f49dacc22003bb6365ca2a24b6a2f1caea6a637eab667d.png","subfolder":"","type":"input"} 
+2026-11-02 23:36:54,589 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/upload/image "HTTP/1.1 200 OK"
+2026-11-02 23:36:54,630 INFO cloud POST /api/upload/image -> HTTP 200 {"name":"6cc8e3db70d5d54eeac71fa744d40411a411d62029fabf9f016b84d9a57439f2.png","subfolder":"","type":"input"} 
+2026-11-02 23:36:55,554 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/upload/image "HTTP/1.1 200 OK"
+2026-11-02 23:36:55,562 INFO cloud POST /api/upload/image -> HTTP 200 {"name":"eaa61bc04c293cb944a0b910c3874d7f66f94afa308dde71fab51fb273a9e0e3.png","subfolder":"","type":"input"} 
+2026-11-02 23:36:56,468 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/upload/image "HTTP/1.1 200 OK"
+2026-11-02 23:36:56,473 INFO cloud POST /api/upload/image -> HTTP 200 {"name":"7e745369c1d5b183505346658b0d83b0042f99650968967ad8d594ced2bc3f95.png","subfolder":"","type":"input"} 
+2026-11-02 23:36:57,420 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/upload/image "HTTP/1.1 200 OK"
+2026-11-02 23:36:57,423 INFO cloud POST /api/upload/image -> HTTP 200 {"name":"564908bb4b2e9cbe45e6d63a7dc6e8f271a467e44f493dd138d08075877bb5a6.png","subfolder":"","type":"input"} 
+2026-11-02 23:36:58,246 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/prompt "HTTP/1.1 200 OK"
+2026-11-02 23:36:58,250 INFO cloud POST /api/prompt -> HTTP 200 {"node_errors":{},"prompt_id":"06f94df3-b958-48c3-95a9-2448eed962ed"} 
+2026-11-02 23:36:58,770 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/06f94df3-b958-48c3-95a9-2448eed962ed/status "HTTP/1.1 200 OK"
+2026-11-02 23:37:03,293 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/06f94df3-b958-48c3-95a9-2448eed962ed/status "HTTP/1.1 200 OK"
+2026-11-02 23:37:08,071 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/06f94df3-b958-48c3-95a9-2448eed962ed/status "HTTP/1.1 200 OK"
+2026-11-02 23:37:12,587 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/06f94df3-b958-48c3-95a9-2448eed962ed/status "HTTP/1.1 200 OK"
+2026-11-02 23:37:17,100 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/06f94df3-b958-48c3-95a9-2448eed962ed/status "HTTP/1.1 200 OK"
+2026-11-02 23:37:21,619 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/06f94df3-b958-48c3-95a9-2448eed962ed/status "HTTP/1.1 200 OK"
+2026-11-02 23:37:26,122 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/06f94df3-b958-48c3-95a9-2448eed962ed/status "HTTP/1.1 200 OK"
+2026-11-02 23:37:26,688 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/jobs/06f94df3-b958-48c3-95a9-2448eed962ed "HTTP/1.1 200 OK"
+2026-11-02 23:37:26,691 INFO cloud GET /api/jobs/06f94df3-b958-48c3-95a9-2448eed962ed -> HTTP 200 {"create_time":1793680618155,"execution_end_time":1793680643217,"execution_meta":{"27":{"display_node":"27","node_id":"27","parent_node":null,"real_node_id":"27"}},"execution_start_time":1793680621776,"execution_status":{"completed":true,"messages":[["execution_start",{"prompt_id":"06f94df3-b958-48c
+2026-11-02 23:37:27,336 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/view?filename=ffe141c68dcc12467af666b964923ac81f645943c1befb84bdfcae2b2f08a87c.mp4&subfolder=metamorph&type=output "HTTP/1.1 302 Found"
+2026-11-02 23:37:27,860 INFO httpx HTTP Request: GET https://storage.googleapis.com/comfy-cloud-assets/ffe141c68dcc12467af666b964923ac81f645943c1befb84bdfcae2b2f08a87c.mp4?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comfy-cloud-prod-workload-sa%40comfy-cloud-prod.iam.gserviceaccount.com%2F20261103%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20261103T043727Z&X-Goog-Expires=21599&X-Goog-Signature=6f03c1d6704a3c5fe06767c34095a5b24485cefa476c3f0b72338fbde954dbf2f348bdb30deee6b33ab2f91b345872bf6f5f1a689d6e898727945fa724e4a224f2bb615553202c154d3227683dc06a4f19fc7039e45d2f06938b16572ed7be14f4be5d489f965b580ca39ef28724787a1536fefbc40af73e9de5e32006433d6afdbdc21df3e0aeea4d916006f65825037a0816240b3c871dc250352cd6bd133089e1f9c3f52943d52f6053cba213750fa8bdcbed88a31c5eb3125f440593d9a4618de2b53666a961ff41d9cecc943a7c398c000bb88c9583fd80993fd077bcaea8e13bcd1b6730079be39205621d7128a033ce93411ea821d2ca1d05fdc044dc&X-Goog-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3D%22metamorph%2Ftake_00001_.mp4%22&response-content-type=video%2Fmp4 "HTTP/1.1 200 OK"
+2026-11-02 23:37:27,983 INFO pipeline.evolve render done -> ../docs/runs/var/five/take.mp4 (97 frames, 4.04s, 30.5s wall)
+{"path": "../docs/runs/var/five/take.mp4", "duration_s": 4.041666666666667, "width": 480, "height": 832}

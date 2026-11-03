@@ -74,6 +74,26 @@
     "inputs": { "image": ["11", 0], "upscale_method": "lanczos", "width": 480, "height": 832, "crop": "center" },
     "_meta": { "title": "Scale guide 3" }
   },
+  "34": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "stage_4.png" },
+    "_meta": { "title": "Guide 4 (frame 4/5)" }
+  },
+  "35": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "stage_5.png" },
+    "_meta": { "title": "Guide 5 (last frame)" }
+  },
+  "36": {
+    "class_type": "ImageScale",
+    "inputs": { "image": ["34", 0], "upscale_method": "lanczos", "width": 480, "height": 832, "crop": "center" },
+    "_meta": { "title": "Scale guide 4" }
+  },
+  "37": {
+    "class_type": "ImageScale",
+    "inputs": { "image": ["35", 0], "upscale_method": "lanczos", "width": 480, "height": 832, "crop": "center" },
+    "_meta": { "title": "Scale guide 5" }
+  },
   "12": {
     "class_type": "LTXVImgToVideo",
     "inputs": { "positive": ["7", 0], "negative": ["7", 1], "vae": ["3", 0], "image": ["30", 0], "width": 480, "height": 832, "length": 49, "batch_size": 1, "strength": 1.0 },
@@ -94,6 +114,16 @@
     "inputs": { "positive": ["14", 0], "negative": ["14", 1], "vae": ["3", 0], "latent": ["14", 2], "image": ["33", 0], "frame_idx": 48, "strength": 1.0 },
     "_meta": { "title": "Guide 3 (last frame)" }
   },
+  "38": {
+    "class_type": "LTXVAddGuide",
+    "inputs": { "positive": ["15", 0], "negative": ["15", 1], "vae": ["3", 0], "latent": ["15", 2], "image": ["36", 0], "frame_idx": 48, "strength": 1.0 },
+    "_meta": { "title": "Guide 4 (frame 4/5)" }
+  },
+  "39": {
+    "class_type": "LTXVAddGuide",
+    "inputs": { "positive": ["38", 0], "negative": ["38", 1], "vae": ["3", 0], "latent": ["38", 2], "image": ["37", 0], "frame_idx": 48, "strength": 1.0 },
+    "_meta": { "title": "Guide 5 (last frame)" }
+  },
   "16": {
     "class_type": "LTXVEmptyLatentAudio",
     "inputs": { "frames_number": 49, "frame_rate": 24, "batch_size": 1, "audio_vae": ["4", 0] },
@@ -101,12 +131,12 @@
   },
   "17": {
     "class_type": "LTXVConcatAVLatent",
-    "inputs": { "video_latent": ["15", 2], "audio_latent": ["16", 0] },
+    "inputs": { "video_latent": ["39", 2], "audio_latent": ["16", 0] },
     "_meta": { "title": "Concat video + audio latent" }
   },
   "18": {
     "class_type": "LTXVDualCFGGuider",
-    "inputs": { "model": ["1", 0], "positive": ["15", 0], "negative": ["15", 1], "video_cfg": 1.0, "audio_cfg": 1.0 },
+    "inputs": { "model": ["1", 0], "positive": ["39", 0], "negative": ["39", 1], "video_cfg": 1.0, "audio_cfg": 1.0 },
     "_meta": { "title": "Dual CFG guider" }
   },
   "19": {

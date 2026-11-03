@@ -1,0 +1,29 @@
+[
+  {
+    "label": "Metal ring",
+    "prompt": "a polished silver metal ring on dark stone, studio light, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/var/three/stages/stage-0.png",
+    "prompt_id": "fe72584b-9328-49c6-a4ba-912e85013bed",
+    "seconds": 30.1,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Living plant",
+    "prompt": "a ring made of living green moss, ivy leaves and roots, wet organic plant matter, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/var/three/stages/stage-1.png",
+    "prompt_id": "0d98675c-709f-4a1d-9665-8d7cae3a6755",
+    "seconds": 21.4,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Mechanical organism",
+    "prompt": "a ring made of brass and steel gears, pistons and articulated joints, mechanical organism, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/var/three/stages/stage-2.png",
+    "prompt_id": "e5624c3f-e1fd-48ad-a03b-fe0d394dcd43",
+    "seconds": 12.2,
+    "image_model": "sdxl"
+  }
+]

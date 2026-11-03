@@ -46,7 +46,7 @@ def _stage_images(images_dir: Path) -> list[Path]:
     if manifest.exists():
         data = json.loads(manifest.read_text())
         paths = [Path(item["path"]) for item in data]
-        if len(paths) == 4 and all(p.exists() for p in paths):
+        if 2 <= len(paths) <= 6 and all(p.exists() for p in paths):
             return paths
     return sorted(images_dir.glob("stage-*.png"))
 
@@ -74,8 +74,8 @@ async def cmd_stages(args: argparse.Namespace) -> None:
 
 async def cmd_render(args: argparse.Namespace) -> None:
     images = _stage_images(Path(args.images))
-    if len(images) != 4:
-        sys.exit(f"render needs exactly 4 stage images, found {len(images)} in {args.images}")
+    if not 2 <= len(images) <= 6:
+        sys.exit(f"render needs 2-6 stage images, found {len(images)} in {args.images}")
     spec = EvolutionSpec(
         frames=args.frames,
         width=args.width,

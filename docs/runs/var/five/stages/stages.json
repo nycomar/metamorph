@@ -1,0 +1,47 @@
+[
+  {
+    "label": "Metal ring",
+    "prompt": "a polished silver metal ring on dark stone, studio light, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/var/five/stages/stage-0.png",
+    "prompt_id": "06ff3739-c1af-4e41-9a5d-626ae1ab79a6",
+    "seconds": 7.9,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Living plant",
+    "prompt": "a ring made of living green moss, ivy leaves and roots, wet organic plant matter, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/var/five/stages/stage-1.png",
+    "prompt_id": "a31bb6ff-e559-4780-96c5-d895b42349ae",
+    "seconds": 43.8,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Organic flesh",
+    "prompt": "a ring of wet glistening red organic flesh, veins and muscle texture, softly breathing, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/var/five/stages/stage-2.png",
+    "prompt_id": "1c53d4b1-8f33-4bae-9a4d-6e9451b239b8",
+    "seconds": 21.2,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Brass machine",
+    "prompt": "a ring made of brass gears, copper pipes and rivets, steampunk mechanical organism, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/var/five/stages/stage-3.png",
+    "prompt_id": "d91e0d17-aedb-439d-aa3c-9d2d23dac389",
+    "seconds": 12.1,
+    "image_model": "sdxl"
+  },
+  {
+    "label": "Chrome machine",
+    "prompt": "a ring made of polished chrome steel with blue glowing seams, futuristic mechanical organism, same circular silhouette",
+    "weight": 1.0,
+    "path": "../docs/runs/var/five/stages/stage-4.png",
+    "prompt_id": "332428e0-c1a1-45ec-b895-189a8c7aa85d",
+    "seconds": 12.2,
+    "image_model": "sdxl"
+  }
+]

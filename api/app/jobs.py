@@ -41,8 +41,8 @@ async def _render(conn: sqlite3.Connection, row: sqlite3.Row) -> None:
     stage_rows = conn.execute(
         "SELECT * FROM stages WHERE project_id=? ORDER BY position", (project_id,)
     ).fetchall()
-    if len(stage_rows) != 4:
-        raise RuntimeError(f"render needs exactly 4 stages, project has {len(stage_rows)}")
+    if not 2 <= len(stage_rows) <= 6:
+        raise RuntimeError(f"render needs between 2 and 6 stages, project has {len(stage_rows)}")
 
     specs = [
         StageSpec(label=s["label"], prompt=s["prompt"], weight=s["weight"]) for s in stage_rows

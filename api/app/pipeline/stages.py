@@ -21,7 +21,7 @@ from ._util import download_first_output, get_client, load_workflow, override, w
 
 log = logging.getLogger("pipeline.stages")
 
-# Appended to every stage prompt so the four guides share a background/lighting
+# Appended to every stage prompt so the guides share a background/lighting
 # and the model only has to change material, not composition.
 STAGE_PROMPT_SUFFIX = ", single object centered on dark stone, soft studio lighting, photorealistic, high detail"
 

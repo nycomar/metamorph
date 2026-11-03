@@ -175,10 +175,10 @@ async def queue_render(project_id: str) -> dict:
     count = conn.execute(
         "SELECT COUNT(*) FROM stages WHERE project_id=?", (project_id,)
     ).fetchone()[0]
-    if count != 4:
+    if not 2 <= count <= 6:
         raise HTTPException(
             status_code=400,
-            detail=f"render needs exactly 4 stages, project has {count}",
+            detail=f"render needs between 2 and 6 stages, project has {count}",
         )
 
     job_id = uuid.uuid4().hex

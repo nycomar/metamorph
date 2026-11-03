@@ -429,8 +429,8 @@ export default function App() {
       setError("Upload a source photo first.");
       return;
     }
-    if (stageListRef.current.length !== 4) {
-      setError(`Render needs exactly 4 stages — this project has ${stageListRef.current.length}.`);
+    if (stageListRef.current.length < 2 || stageListRef.current.length > 6) {
+      setError(`Render needs 2-6 stages — this project has ${stageListRef.current.length}.`);
       return;
     }
     if (!isStagesValid(stageListRef.current)) {
@@ -603,7 +603,7 @@ export default function App() {
                 {saveState === "error" && <span className="ml-2 text-red-300">save failed</span>}
               </span>
               <span className={invalidStages ? "text-red-300" : undefined}>
-                {invalidStages ? "every stage needs a label and prompt" : "4 stages required to render"}
+                {invalidStages ? "every stage needs a label and prompt" : "2-6 stages required to render"}
               </span>
             </div>
           </section>

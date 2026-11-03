@@ -1,0 +1,5 @@
+[
+  { "label": "Metal ring", "prompt": "a polished silver metal ring on dark stone, studio light, same circular silhouette", "weight": 1.0 },
+  { "label": "Living plant", "prompt": "a ring made of living green moss, ivy leaves and roots, wet organic plant matter, same circular silhouette", "weight": 1.0 },
+  { "label": "Mechanical organism", "prompt": "a ring made of brass and steel gears, pistons and articulated joints, mechanical organism, same circular silhouette", "weight": 1.0 }
+]

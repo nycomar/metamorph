@@ -15,6 +15,37 @@ lost the solid wreath silhouette and read as tiny sprouts, not wet moss), so the
 runtime default stays `sdxl`. The FLUX graph remains available with
 `--image-model flux`.
 
+## Evolution graph (`evolve.json`, 2-6 stages)
+
+Stage 0 is the `LTXVImgToVideo` start image; stages 1..N-1 are pinned to evenly
+spread frames through five chained `LTXVAddGuide` nodes. The graph is built for
+the 6-stage maximum; `render_evolution` removes the guide nodes a shorter run
+does not use, so they cannot render a phantom stage.
+
+| Input | Node id | Field | Value |
+| --- | --- | --- | --- |
+| Start image | `8` / `30` | LoadImage `image`, ImageScale | stage 0 (`stage_0.png`) |
+| Guide 1 | `9` / `31` | LoadImage `image`, ImageScale | stage 1 |
+| Guide 2 | `10` / `32` | LoadImage `image`, ImageScale | stage 2 |
+| Guide 3 | `11` / `33` | LoadImage `image`, ImageScale | stage 3 |
+| Guide 4 | `34` / `36` | LoadImage `image`, ImageScale | stage 4 (new) |
+| Guide 5 | `35` / `37` | LoadImage `image`, ImageScale | stage 5 (new) |
+| Start frame | `12` | `image`, `width`, `height`, `length` | `30[0]`, render size, frames |
+| Add guide 1 | `13` | `image`, `frame_idx`, `strength` | `31[0]`, formula, 1.0 |
+| Add guide 2 | `14` | `image`, `frame_idx`, `strength` | `32[0]`, formula, 1.0 |
+| Add guide 3 | `15` | `image`, `frame_idx`, `strength` | `33[0]`, formula, 1.0 |
+| Add guide 4 | `38` | `image`, `frame_idx`, `strength` | `36[0]`, formula, 1.0 (new) |
+| Add guide 5 | `39` | `image`, `frame_idx`, `strength` | `37[0]`, formula, 1.0 (new) |
+| Video latent | `17` | `video_latent` | last used guide `[n, 2]` |
+| Guider | `18` | `positive`, `negative` | last used guide `[n, 0]`, `[n, 1]` |
+| Audio latent | `16` | `frames_number` | render frames |
+| Noise | `19` | `noise_seed` | render seed |
+| Save | `27` | `filename_prefix` | `metamorph/<take>` |
+
+Guide frame for stage `i` of `N` is `round(i / (N-1) * (frames-1))`; stage 0 is
+frame 0 and the last stage is `frames-1`. Node ids `8`-`15` are unchanged from
+the original 4-stage graph; `34`-`39` are the added 5th/6th-stage slots.
+
 ## FLUX stage graph (`stage_flux.json`, `image_model=flux`)
 
 FLUX.1-dev is guidance-distilled: it runs at **cfg 1.0** and uses `FluxGuidance`

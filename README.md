@@ -11,7 +11,7 @@ The stage images are never the output. They are pinned to specific frames of **o
 ```
 photo → structural anchors (depth + edges)
       → N stage images (ControlNet-locked to the anchors)
-      → guides pinned at frames 0, 1/3, 2/3, end
+      → guides pinned at evenly spaced frames, first to last
       → one LTX-2.5 pass (video + audio)
       → continuous morph → loop / 9:16 / 16:9 export
 ```

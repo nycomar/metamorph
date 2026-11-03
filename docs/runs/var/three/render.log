@@ -1,0 +1,21 @@
+2026-11-02 23:32:49,177 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/upload/image "HTTP/1.1 200 OK"
+2026-11-02 23:32:49,180 INFO cloud POST /api/upload/image -> HTTP 200 {"name":"c78a6184b93b754418f49dacc22003bb6365ca2a24b6a2f1caea6a637eab667d.png","subfolder":"","type":"input"} 
+2026-11-02 23:32:50,204 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/upload/image "HTTP/1.1 200 OK"
+2026-11-02 23:32:50,212 INFO cloud POST /api/upload/image -> HTTP 200 {"name":"6cc8e3db70d5d54eeac71fa744d40411a411d62029fabf9f016b84d9a57439f2.png","subfolder":"","type":"input"} 
+2026-11-02 23:32:51,138 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/upload/image "HTTP/1.1 200 OK"
+2026-11-02 23:32:51,145 INFO cloud POST /api/upload/image -> HTTP 200 {"name":"577b5d306b9b235f3d047bef51727e0a2d4d4850debd4c08e6d140bd112738d1.png","subfolder":"","type":"input"} 
+2026-11-02 23:32:51,912 INFO httpx HTTP Request: POST https://cloud.comfy.org/api/prompt "HTTP/1.1 200 OK"
+2026-11-02 23:32:51,921 INFO cloud POST /api/prompt -> HTTP 200 {"node_errors":{},"prompt_id":"e31de7f1-c68a-4538-9bf9-124c948592dc"} 
+2026-11-02 23:32:52,407 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/e31de7f1-c68a-4538-9bf9-124c948592dc/status "HTTP/1.1 200 OK"
+2026-11-02 23:32:56,962 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/e31de7f1-c68a-4538-9bf9-124c948592dc/status "HTTP/1.1 200 OK"
+2026-11-02 23:33:01,480 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/e31de7f1-c68a-4538-9bf9-124c948592dc/status "HTTP/1.1 200 OK"
+2026-11-02 23:33:06,007 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/e31de7f1-c68a-4538-9bf9-124c948592dc/status "HTTP/1.1 200 OK"
+2026-11-02 23:33:10,510 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/e31de7f1-c68a-4538-9bf9-124c948592dc/status "HTTP/1.1 200 OK"
+2026-11-02 23:33:15,010 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/e31de7f1-c68a-4538-9bf9-124c948592dc/status "HTTP/1.1 200 OK"
+2026-11-02 23:33:19,496 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/job/e31de7f1-c68a-4538-9bf9-124c948592dc/status "HTTP/1.1 200 OK"
+2026-11-02 23:33:20,077 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/jobs/e31de7f1-c68a-4538-9bf9-124c948592dc "HTTP/1.1 200 OK"
+2026-11-02 23:33:20,085 INFO cloud GET /api/jobs/e31de7f1-c68a-4538-9bf9-124c948592dc -> HTTP 200 {"create_time":1793680371823,"execution_end_time":1793680395714,"execution_meta":{"27":{"display_node":"27","node_id":"27","parent_node":null,"real_node_id":"27"}},"execution_start_time":1793680374368,"execution_status":{"completed":true,"messages":[["execution_start",{"prompt_id":"e31de7f1-c68a-453
+2026-11-02 23:33:20,695 INFO httpx HTTP Request: GET https://cloud.comfy.org/api/view?filename=c341d70779178ba5092941c31005faf64ba060e3481d52de0f80b5dc581d61f9.mp4&subfolder=metamorph&type=output "HTTP/1.1 302 Found"
+2026-11-02 23:33:21,281 INFO httpx HTTP Request: GET https://storage.googleapis.com/comfy-cloud-assets/c341d70779178ba5092941c31005faf64ba060e3481d52de0f80b5dc581d61f9.mp4?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=comfy-cloud-prod-workload-sa%40comfy-cloud-prod.iam.gserviceaccount.com%2F20261103%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20261103T043320Z&X-Goog-Expires=21599&X-Goog-Signature=4f79a798785b3dd7702c67e31cc67c1975cb33c7d86ffc27c27358527649667c32fa6b9467860346281edd98079eb137ca1b52dd3f186b09eb9e01d2df4e9c0d3d116f84919649878b87f5d0a2abe535841ae42f816c5a7916ecee7310610d134ca76d069a3757f708d4e8c7c77dc56a875df7e872cfa2ee6989f84d2d8d88b65259553a45c4d546e6fb1442974624170fbbff336432e4facb8418a78a505e00b4453b0478b1928d0eef6ee842a3ecf7b062b96c9288e868b3b0decf4988667d398a75a3cbd00afa107a28f8445227f131be0c040f8cd92f388f71c9a0b4ae7f7cc706191893cd6851c340e4a5217d5447973e3e881f37536253efbbb908bb3b&X-Goog-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3D%22metamorph%2Ftake_00001_.mp4%22&response-content-type=video%2Fmp4 "HTTP/1.1 200 OK"
+2026-11-02 23:33:21,481 INFO pipeline.evolve render done -> ../docs/runs/var/three/take.mp4 (121 frames, 5.04s, 30.3s wall)
+{"path": "../docs/runs/var/three/take.mp4", "duration_s": 5.041666666666667, "width": 480, "height": 832}

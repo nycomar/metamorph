@@ -1,8 +1,11 @@
 """Evolution render: N stage images pinned to frames -> one continuous LTX-2.5 video.
 
 The graph is ``workflows/evolve.json`` (LTX-2.5 distilled, single pass, video +
-audio). Four guides land at frames 0, 1/3, 2/3, end via ``LTXVImgToVideo`` (frame
-0) and three chained ``LTXVAddGuide`` nodes; the model invents everything between.
+audio). The first stage lands at frame 0 via ``LTXVImgToVideo``; stages 1..N-1
+land on evenly spaced frames via chained ``LTXVAddGuide`` nodes (up to five, so
+2-6 stages). Guides the current run does not need are removed from the submitted
+graph, and the tail is rewired to the last used guide, so unused slots never
+render a phantom stage.
 """
 from __future__ import annotations
 
@@ -16,9 +19,11 @@ from ._util import FPS, download_first_output, get_client, load_workflow, overri
 log = logging.getLogger("pipeline.evolve")
 
 GUIDE_STRENGTH = 1.0
-GUIDE_NODES = ("8", "9", "10", "11")          # LoadImage per guide
-SCALE_NODES = ("30", "31", "32", "33")        # ImageScale per guide
-ADD_GUIDE_NODES = ("13", "14", "15")          # chained LTXVAddGuide (frames 1/3, 2/3, end)
+MIN_STAGES = 2
+MAX_STAGES = 6
+GUIDE_NODES = ("8", "9", "10", "11", "34", "35")       # LoadImage per stage
+SCALE_NODES = ("30", "31", "32", "33", "36", "37")     # ImageScale per stage
+ADD_GUIDE_NODES = ("13", "14", "15", "38", "39")       # chained LTXVAddGuide (stages 1..5)
 
 EVOLVE_PROMPT = (
     "An object shaped like a ring sits centered on dark stone under soft studio light, "
@@ -52,18 +57,10 @@ class RenderResult:
     height: int
 
 
-def _guide_indices(frames: int) -> list[int]:
-    """Frame indices for the four guides: 0, 1/3, 2/3, last.
-
-    LTXV guide frames must be a multiple of 8 (they are rounded down otherwise),
-    so each is snapped to the nearest multiple of 8 and kept below ``frames - 1``.
-    """
+def _guide_indices(frames: int, count: int) -> list[int]:
+    """Evenly spread ``count`` guide frames across ``frames`` (first 0, last frames-1)."""
     last = frames - 1
-
-    def snap(x: float) -> int:
-        return int(round(x / 8) * 8)
-
-    return [0, min(snap(last / 3), last - 1), min(snap(2 * last / 3), last - 1), last]
+    return [round(i / (count - 1) * last) for i in range(count)]
 
 
 async def render_evolution(
@@ -72,10 +69,13 @@ async def render_evolution(
     out_path: Path,
 ) -> RenderResult:
     """Render one continuous metamorphosis shot and write it to ``out_path``."""
-    if len(stage_images) != 4:
-        raise ValueError(f"render_evolution expects exactly 4 stage images, got {len(stage_images)}")
+    count = len(stage_images)
+    if not MIN_STAGES <= count <= MAX_STAGES:
+        raise ValueError(
+            f"render_evolution expects {MIN_STAGES}-{MAX_STAGES} stage images, got {count}"
+        )
     if spec.loop:
-        log.warning("spec.loop=True is not yet wired (linear 4-stage arc does not close a loop)")
+        log.warning("spec.loop=True is not yet wired (linear metamorphosis arc does not close a loop)")
 
     client = get_client()
     workflow = load_workflow("evolve.json")
@@ -89,19 +89,33 @@ async def render_evolution(
     for node_id, name in zip(GUIDE_NODES, names):
         wf = override(wf, node_id, "image", name)
 
-    idx = _guide_indices(spec.frames)
+    idx = _guide_indices(spec.frames, count)
+    used_guides = ADD_GUIDE_NODES[: count - 1]
+    used_scales = SCALE_NODES[:count]
     wf = override(wf, "12", "width", spec.width)     # LTXVImgToVideo (frame 0)
     wf = override(wf, "12", "height", spec.height)
     wf = override(wf, "12", "length", spec.frames)
-    for node_id, frame_idx in zip(ADD_GUIDE_NODES, idx[1:]):
+    for node_id, frame_idx in zip(used_guides, idx[1:]):
         wf = override(wf, node_id, "frame_idx", frame_idx)
         wf = override(wf, node_id, "strength", GUIDE_STRENGTH)
     wf = override(wf, "16", "frames_number", spec.frames)  # audio latent must match video
     wf = override(wf, "19", "noise_seed", spec.seed)
-    for node_id in SCALE_NODES:
+    for node_id in used_scales:
         wf = override(wf, node_id, "width", spec.width)
         wf = override(wf, node_id, "height", spec.height)
     wf = override(wf, "27", "filename_prefix", f"metamorph/{out_path.stem}")
+
+    # Drop guides the run does not use, and point the tail at the last real guide.
+    tail = used_guides[-1]
+    wf = override(wf, "17", "video_latent", [tail, 2])
+    wf = override(wf, "18", "positive", [tail, 0])
+    wf = override(wf, "18", "negative", [tail, 1])
+    unused = (
+        set(ADD_GUIDE_NODES[count - 1 :])
+        | set(GUIDE_NODES[count:])
+        | set(SCALE_NODES[count:])
+    )
+    wf = {node_id: node for node_id, node in wf.items() if node_id not in unused}
 
     t0 = time.monotonic()
     prompt_id = await client.submit(wf)
