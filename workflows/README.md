@@ -109,3 +109,55 @@ The canny loader/preprocessor/apply nodes are gone from this graph (former ids
 `5`, `8`, `10`). Do not pass a canny override: there is no node `10` any more.
 IPAdapter is SDXL-only; `--ipa-weight` / `--ipa-weight-type` are rejected when
 `image_model=flux`.
+
+## MiniMax H3 evolution graph (`evolve_h3.json`, `video_model=h3`)
+
+This is an experimental comparison path. The LTX graph above stays the default
+(`video_model="ltx"` / `--video-model ltx`); selecting `h3` swaps in
+`workflows/evolve_h3.json` and its own override table without changing the LTX
+graph or overrides.
+
+The graph is MiniMax H3 **fl2va** with native audio. Stage 0 is the
+`MiniMaxH3ImageToVideo.first_frame` anchor; stages 1..N-1 are
+`MiniMaxH3AddGuide` anchors chained through the same positive conditioning. The
+video node owns the prompt; the guide images carry the material changes.
+
+Model files (resolved from `/api/object_info` on this account):
+
+| Role | Node | File |
+| --- | --- | --- |
+| Diffusion model | `UNETLoader` (`1`) | `minimax_h3_fl2va_pruned_int8_convrot.safetensors` |
+| Text encoder | `CLIPLoader` (`2`) | `qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors` (`type: minimax`) |
+| Video VAE | `VAELoader` (`3`) | `minimax_h3_video_vae_fp16.safetensors` |
+| Audio VAE | `VAELoader` (`4`) | `minimax_h3_audio_vae_fp32.safetensors` |
+
+| Input | Node id | Field | Value |
+| --- | --- | --- | --- |
+| Start image | `8` / `30` | LoadImage `image`, ImageScale | stage 0 (`stage_0.png`) |
+| Guide 1 | `9` / `31` | LoadImage `image`, ImageScale | stage 1 |
+| Guide 2 | `10` / `32` | LoadImage `image`, ImageScale | stage 2 |
+| Guide 3 | `11` / `33` | LoadImage `image`, ImageScale | stage 3 |
+| Guide 4 | `34` / `36` | LoadImage `image`, ImageScale | stage 4 |
+| Guide 5 | `35` / `37` | LoadImage `image`, ImageScale | stage 5 |
+| Video + first frame | `12` | `prompt`, `width`, `height`, `length`, `first_frame` | prompt, render size, frames, `30[0]` |
+| Add guide 1 | `13` | `positive`, `latent`, `vae`, `image`, `frame_idx` | `12[0]`, `12[1]`, `3[0]`, `31[0]`, formula |
+| Add guide 2 | `14` | `positive`, `latent`, `vae`, `image`, `frame_idx` | `13[0]`, `12[1]`, `3[0]`, `32[0]`, formula |
+| Add guide 3 | `15` | `positive`, `latent`, `vae`, `image`, `frame_idx` | `14[0]`, `12[1]`, `3[0]`, `33[0]`, formula |
+| Add guide 4 | `38` | `positive`, `latent`, `vae`, `image`, `frame_idx` | `15[0]`, `12[1]`, `3[0]`, `36[0]`, formula |
+| Add guide 5 | `39` | `positive`, `latent`, `vae`, `image`, `frame_idx` | `38[0]`, `12[1]`, `3[0]`, `37[0]`, formula |
+| Guider | `18` | `model`, `conditioning` | `1[0]`, last used guide `[n, 0]` |
+| Sigma schedule | `20` | `scheduler`, `steps`, `denoise` | `simple`, 20, 1.0 |
+| Sampler | `21` | `sampler_name` | `res_multistep` |
+| Noise | `19` | `noise_seed` | render seed |
+| Sampler | `22` | `noise`, `guider`, `sampler`, `sigmas`, `latent_image` | `19[0]`, `18[0]`, `21[0]`, `20[0]`, `12[1]` |
+| Decode video | `24` | `samples`, `vae` | `22[0]`, `3[0]` |
+| Decode audio | `25` | `samples`, `vae` | `22[0]`, `4[0]` |
+| Mux | `26` | `images`, `fps`, `audio` | `24[0]`, 24.0, `25[0]` |
+| Save | `27` | `filename_prefix` | `metamorph/<take>` |
+
+Guide frame for stage `i` of `N` is `round(i / (N-1) * (length-1))`; stage 0 is
+frame 0 and the last stage is `length-1`. H3 only accepts lengths on its
+**17k+5** frame grid (at 24 fps), so `render_evolution` snaps the requested
+length up before computing the indices (for example a request of 121 becomes
+124, with guides at 0 / 41 / 82 / 123 for four stages). Unused guide, LoadImage
+and ImageScale nodes are removed from the submitted graph, like the LTX path.

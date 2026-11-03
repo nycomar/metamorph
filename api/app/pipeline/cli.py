@@ -83,7 +83,7 @@ async def cmd_render(args: argparse.Namespace) -> None:
         seed=args.seed,
         loop=args.loop,
     )
-    result = await render_evolution(images, spec, Path(args.out))
+    result = await render_evolution(images, spec, Path(args.out), video_model=args.video_model)
     print(json.dumps({"path": str(result.path), "duration_s": result.duration_s, "width": result.width, "height": result.height}))
 
 
@@ -119,6 +119,12 @@ def main() -> None:
     p_render.add_argument("--height", type=int, default=832)
     p_render.add_argument("--seed", type=int, default=0)
     p_render.add_argument("--loop", action="store_true")
+    p_render.add_argument(
+        "--video-model",
+        choices=("ltx", "h3"),
+        default="ltx",
+        help="video model / graph (default: ltx)",
+    )
     p_render.set_defaults(func=cmd_render)
 
     args = parser.parse_args()
